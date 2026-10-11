@@ -1,0 +1,7 @@
+device: xiaomi-ax6000
+target: qualcommax
+subtarget: ipq50xx
+profile: xiaomi_ax6000
+arch: aarch64_cortex-a53
+ref: f0a60eee2fe051741c643ea6118718aae1ef17fb   # = OpenWrt v25.12.5
+ref_name: v25.12.5
