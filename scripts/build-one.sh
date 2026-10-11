@@ -76,20 +76,38 @@ fi
 
 ( cd "$TREE" && make defconfig )
 
-# 4. Копирование преднастроек и загрузка SSClash-Go
+# 4. Подготовка файлов образа
 echo "[4/5] подготовка файлов образа..."
-mkdir -p "$TREE/files/opt/clash/bin" "$TREE/files/etc/init.d"
+mkdir -p "$TREE/files/opt/clash/bin" "$TREE/files/etc/init.d" "$TREE/files/usr/bin"
 
 if [ -d "$BUILDER_DIR/files" ]; then
   cp -r "$BUILDER_DIR/files/"* "$TREE/files/"
 fi
 
-echo "      загрузка SSClash-Go (arm64)..."
+# Скачивание SSClash-Go
+echo "      загрузка SSClash-Go..."
 curl -sL https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-linux-arm64 -o "$TREE/files/opt/clash/bin/ssclash"
 chmod +x "$TREE/files/opt/clash/bin/ssclash"
-
 curl -sL https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-openwrt-service.tar.gz | tar -xz -C "$TREE/files/"
 chmod +x "$TREE/files/etc/init.d/ssclash"
+
+# Загрузка и распаковка официального пакета FPTN под OpenWrt ARM64
+echo "      загрузка FPTN Client (OpenWrt 25.12 arm64)..."
+FPTN_URL=$(curl -s https://api.github.com/repos/fptn-project/fptn/releases/latest | grep "browser_download_url.*openwrt-25.12.*aarch64.*\.apk" | head -n 1 | cut -d '"' -f 4 || true)
+if [ -n "$FPTN_URL" ]; then
+  curl -sL "$FPTN_URL" -o /tmp/fptn.apk
+  tar -xzf /tmp/fptn.apk -C "$TREE/files/" 2>/dev/null || tar -xf /tmp/fptn.apk -C "$TREE/files/" 2>/dev/null || true
+  rm -f /tmp/fptn.apk
+fi
+
+# Сборка LaLune (Go binary для ARM64)
+echo "      сборка LaLune из GitHub..."
+rm -rf /tmp/lalune
+if git clone --depth 1 https://github.com/Endlad2/LaLune.git /tmp/lalune 2>/dev/null; then
+  ( cd /tmp/lalune && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o "$TREE/files/usr/bin/lalune" . 2>/dev/null ) || true
+  chmod +x "$TREE/files/usr/bin/lalune" 2>/dev/null || true
+  rm -rf /tmp/lalune
+fi
 
 sh scripts/preflight.sh "$CARD" "$TREE"
 
