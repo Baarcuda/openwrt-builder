@@ -39,8 +39,8 @@ jobs:
             gettext git libncurses-dev libssl-dev python3-setuptools \
             rsync unzip zlib1g-dev file wget curl
 
-      - name: Определение карточки устройства
-        id: select_card
+      - name: Определение карточки устройства и версии
+        id: info
         run: |
           if [ "${{ inputs.device }}" = "custom" ]; then
             CARD="${{ inputs.custom_card }}"
@@ -53,15 +53,35 @@ jobs:
           fi
           echo "card=$CARD" >> $GITHUB_OUTPUT
 
+          # Извлекаем версию (ref_name или первые 8 символов коммита ref)
+          VERSION=$(grep -E '^ref_name:' "$CARD" | awk '{print $2}' | sed 's/#.*//' | tr -d ' ')
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep -E '^ref:' "$CARD" | awk '{print $2}' | cut -c1-8)
+          fi
+          [ -z "$VERSION" ] && VERSION="snapshot"
+
+          BUILD_DATE=$(date +'%Y%m%d')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+
       - name: Сборка прошивки через build-one.sh
         run: |
-          sh scripts/build-one.sh "${{ steps.select_card.outputs.card }}" --jobs $(nproc)
+          sh scripts/build-one.sh "${{ steps.info.outputs.card }}" --jobs $(nproc)
+
+      - name: Подготовка архива (без глубоких путей)
+        run: |
+          mkdir -p release
+          # Копируем sysupgrade-образы прямо в папку release без вложенных директорий
+          find openwrt/bin/targets/ -type f -name "*sysupgrade.bin" -exec cp -t release/ {} +
+          # Генерируем чистую контрольную сумму строго для этих файлов
+          cd release
+          sha256sum *sysupgrade.bin > sha256sums
+          echo "Готовые файлы к выгрузке:"
+          ls -la
 
       - name: Выгрузка готовых прошивок в артефакты
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-${{ inputs.device }}-images
-          path: |
-            openwrt/bin/targets/*/*/*sysupgrade.bin
-            openwrt/bin/targets/*/*/sha256sums
+          name: openwrt-${{ inputs.device }}-${{ steps.info.outputs.version }}-${{ steps.info.outputs.build_date }}
+          path: release/
           retention-days: 14
