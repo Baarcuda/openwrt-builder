@@ -15,17 +15,15 @@
 
 ---
 
-### Вшитые пакеты и сервисы
-* **SSClash-Go** (панель `:9091`, *по умолчанию выключен*)
-* **FPTN** (веб-интерфейс в LuCI: VPN → FPTN, *по умолчанию выключен*)
-* **LaLune** (DPI/TURN обход блокировок, *по умолчанию выключен*)
+### Вшитые сервисы (из коробки)
+* **SSClash-Go** (веб-панель `:9091`, *по умолчанию выключен*)
+* **FPTN** (веб-интерфейс в LuCI: *VPN → FPTN*, *по умолчанию выключен*)
 * **Zapret / Zapret2** (*по умолчанию выключен*)
 * **Watchcat** (*по умолчанию выключен*)
 * **Динамический DNS** (*по умолчанию выключен*)
 * **OpenVPN** (`luci-app-openvpn`, `openvpn-openssl`)
 * **WireGuard** (`luci-app-wireguard`, `kmod-wireguard`)
 * **AmneziaWG** (`luci-proto-amneziawg`, `kmod-amneziawg`, `amneziawg-tools`)
-* **NetBird** (`netbird`, `luci-app-netbird`)
 * **L2TP-Static** (`xl2tpd`, `ppp-mod-pppol2tp`)
 * **6in4** (`6in4`, `luci-proto-ipv6`)
 * **Терминал** (`luci-app-ttyd`)
@@ -34,3 +32,12 @@
 * **Тема LuCI:** `luci-theme-openwrt-2020`
 * **Русская локализация:** `luci-i18n-*-ru`
 * **Утилиты:** `curl`, `htop`, `nano`
+
+---
+
+### Дополнительные сервисы по запросу
+Для экономии Flash-памяти клиенты NetBird и LaLune устанавливаются в постоянную память `/overlay` одной командой через терминал роутера:
+```bash
+install-extras netbird  # Установить NetBird
+install-extras lalune   # Установить LaLune
+install-extras all      # Установить оба
