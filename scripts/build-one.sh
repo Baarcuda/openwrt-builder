@@ -97,14 +97,24 @@ chmod +x "$TREE/files/opt/clash/bin/ssclash"
 curl -sL https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-openwrt-service.tar.gz | tar -xz -C "$TREE/files/"
 chmod +x "$TREE/files/etc/init.d/ssclash"
 
-# Загрузка и распаковка FPTN
-echo "      загрузка FPTN Client (OpenWrt arm64)..."
-FPTN_URL=$(curl -s https://api.github.com/repos/fptn-project/fptn/releases/latest | grep "browser_download_url.*openwrt-25.12.*aarch64.*\.apk" | head -n 1 | cut -d '"' -f 4 || true)
-if [ -n "$FPTN_URL" ]; then
-  curl -sL "$FPTN_URL" -o /tmp/fptn.apk
-  tar -xzf /tmp/fptn.apk -C "$TREE/files/" 2>/dev/null || tar -xf /tmp/fptn.apk -C "$TREE/files/" 2>/dev/null || true
-  rm -f /tmp/fptn.apk
+# Загрузка и распаковка FPTN (бинарник + LuCI в одном пакете)
+echo "      загрузка FPTN (ARM64 + LuCI)..."
+FPTN_TAG=$(curl -sIL -o /dev/null -w "%{url_effective}" https://github.com/fptn-project/fptn/releases/latest | tr -d "\r" | awk -F"/" "{print \$NF}")
+[ -z "$FPTN_TAG" ] && FPTN_TAG="0.4.6"
+
+FPTN_IPK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-24.10.x-aarch64_cortex-a53.ipk"
+mkdir -p /tmp/fptn_extract
+if curl -sL "$FPTN_IPK" -o /tmp/fptn_extract/fptn.ipk; then
+    ( cd /tmp/fptn_extract && ar -x fptn.ipk 2>/dev/null || tar -xzf fptn.ipk 2>/dev/null || true )
+    if [ -f /tmp/fptn_extract/data.tar.gz ]; then
+        tar -xzf /tmp/fptn_extract/data.tar.gz -C "$TREE/files/"
+        echo "      FPTN успешно распакован в files/"
+    elif [ -f /tmp/fptn_extract/data.tar ]; then
+        tar -xf /tmp/fptn_extract/data.tar -C "$TREE/files/"
+        echo "      FPTN успешно распакован в files/"
+    fi
 fi
+rm -rf /tmp/fptn_extract
 
 sh scripts/preflight.sh "$CARD" "$TREE"
 
