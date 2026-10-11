@@ -62,8 +62,6 @@ jobs:
         with:
           name: openwrt-${{ inputs.device }}-images
           path: |
-            */bin/targets/*/*/*sysupgrade.bin
-            */bin/targets/*/*/*factory*
-            */bin/targets/*/*/sha256sums
-            */bin/targets/*/*/*manifest
+            openwrt/bin/targets/*/*/*sysupgrade.bin
+            openwrt/bin/targets/*/*/sha256sums
           retention-days: 14
