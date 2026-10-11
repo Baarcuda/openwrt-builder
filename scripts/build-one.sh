@@ -78,6 +78,13 @@ fi
 
 ( cd "$TREE" && make defconfig )
 
+# Копирование преднастроек из files/
+if [ -d "$BUILDER_DIR/files" ]; then
+  echo "      копирование преднастроек из files/..."
+  mkdir -p "$TREE/files"
+  cp -r "$BUILDER_DIR/files/"* "$TREE/files/"
+fi
+
 # 4. Preflight
 echo "[4/5] preflight..."
 sh scripts/preflight.sh "$CARD" "$TREE"
