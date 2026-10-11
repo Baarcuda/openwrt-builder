@@ -1,0 +1,20 @@
+Параметры по умолчанию:
+- IP-адрес : 192.168.10.1
+- Wi-Fi    : Включён (пароль: 12345678)
+- Тема     : OpenWrt 2020
+
+Пакеты и сервисы в прошивке:
+- OpenVPN
+- WireGuard
+- AmneziaWG
+- NetBird
+- L2TP-Static
+- 6in4
+- Zapret / Zapret2
+- Watchcat
+- Терминал (ttyd)
+- uHTTPd
+- UPnP IGD и PCP
+- Динамический DNS (DDNS)
+- Тема luci-theme-openwrt-2020
+- curl, htop, nano
