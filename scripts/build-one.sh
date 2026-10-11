@@ -44,7 +44,7 @@ else
 fi
 git -C "$TREE" checkout --detach "$REF"
 
-# 2. Подключение сторонних фидов
+# 2. Подключение сторонних фидов и пакетов
 if [ -f "$BUILDER_DIR/custom_feeds.conf" ]; then
   echo "[2/5] добавление custom_feeds.conf..."
   while IFS= read -r line || [ -n "$line" ]; do
@@ -61,6 +61,12 @@ fi
 
 echo "[2/5] обновление и установка feeds..."
 ( cd "$TREE" && ./scripts/feeds update -a && ./scripts/feeds install -a )
+
+# Клонируем исходники luci-app-netbird прямо в дерево пакетов
+if [ ! -d "$TREE/package/luci-app-netbird" ]; then
+  echo "      клонирование пакета luci-app-netbird в package/..."
+  git clone --depth 1 https://github.com/looong-cat/luci-app-netbird.git "$TREE/package/luci-app-netbird"
+fi
 
 # 3. Формирование .config
 echo "[3/5] генерация .config..."
