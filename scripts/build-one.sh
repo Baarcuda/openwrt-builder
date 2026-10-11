@@ -62,7 +62,7 @@ fi
 echo "[2/5] обновление и установка feeds..."
 ( cd "$TREE" && ./scripts/feeds update -a && ./scripts/feeds install -a )
 
-# 3. Формирование полного .config
+# 3. Формирование .config
 echo "[3/5] генерация .config..."
 cat << CONF > "$TREE/.config"
 CONFIG_TARGET_${TARGET}=y
@@ -70,23 +70,27 @@ CONFIG_TARGET_${TARGET}_${SUBTARGET}=y
 CONFIG_TARGET_${TARGET}_${SUBTARGET}_DEVICE_${PROFILE}=y
 CONF
 
-# Добавляем список сервисов
 if [ -f "$BUILDER_DIR/config/packages.conf" ]; then
-  echo "      внедрение сервисов из config/packages.conf..."
   cat "$BUILDER_DIR/config/packages.conf" >> "$TREE/.config"
 fi
 
 ( cd "$TREE" && make defconfig )
 
-# Копирование преднастроек из files/
+# 4. Копирование преднастроек и загрузка SSClash-Go
+echo "[4/5] подготовка файлов образа..."
+mkdir -p "$TREE/files/opt/clash/bin" "$TREE/files/etc/init.d"
+
 if [ -d "$BUILDER_DIR/files" ]; then
-  echo "      копирование преднастроек из files/..."
-  mkdir -p "$TREE/files"
   cp -r "$BUILDER_DIR/files/"* "$TREE/files/"
 fi
 
-# 4. Preflight
-echo "[4/5] preflight..."
+echo "      загрузка SSClash-Go (arm64)..."
+curl -sL https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-linux-arm64 -o "$TREE/files/opt/clash/bin/ssclash"
+chmod +x "$TREE/files/opt/clash/bin/ssclash"
+
+curl -sL https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-openwrt-service.tar.gz | tar -xz -C "$TREE/files/"
+chmod +x "$TREE/files/etc/init.d/ssclash"
+
 sh scripts/preflight.sh "$CARD" "$TREE"
 
 # 5. Сборка
