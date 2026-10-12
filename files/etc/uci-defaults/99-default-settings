@@ -1,12 +1,28 @@
 #!/bin/sh
 
-# 1. IP адрес LAN: 192.168.10.1 и маска
+# 1. Имя хоста роутера: ax3600
+uci set system.@system[0].hostname='ax3600'
+uci commit system
+
+# 2. IP адрес LAN: 192.168.10.1 и сетевой стек
 uci set network.lan.ipaddr='192.168.10.1'
 uci set network.lan.netmask='255.255.255.0'
+uci set network.lan.ip6assign='60'
 uci set network.globals.packet_steering='1'
 uci commit network
 
-# 2. Сервер раздачи адресов DHCP (dnsmasq)
+# 3. Полное удаление wan6, DUID и исключение из фаервола
+uci -q delete network.wan6
+for z in $(uci -q show firewall | grep "network.*wan6" | cut -d. -f2); do
+    uci -q del_list firewall.${z}.network='wan6'
+done
+uci -q delete dhcp.wan6
+uci -q delete network.globals.duid
+uci commit network
+uci commit firewall
+uci commit dhcp
+
+# 4. Сервер DHCP (dnsmasq) и разгон кэша
 uci set dhcp.lan.interface='lan'
 uci set dhcp.lan.start='100'
 uci set dhcp.lan.limit='150'
@@ -16,22 +32,22 @@ uci set dhcp.@dnsmasq[0].dnsforwardmax='1000'
 uci set dhcp.@dnsmasq[0].logqueries='1'
 uci commit dhcp
 
-# 3. Аппаратное и программное ускорение
+# 5. Аппаратное и программное ускорение
 uci set firewall.@defaults[0].flow_offloading='1'
 uci set firewall.@defaults[0].flow_offloading_hw='1'
 uci commit firewall
 
-# 4. ZRAM компрессия LZ4 (256 МБ)
+# 6. ZRAM компрессия LZ4 (256 МБ)
 uci -q set system.@system[0].zram_comp_algo='lz4'
 uci -q set system.@system[0].zram_size_mb='256'
 uci commit system
 
-# 5. Тема оформления LuCI
+# 7. Тема оформления LuCI
 uci set luci.main.mediaurlbase='/luci-static/openwrt-2020'
 uci commit luci
 
-# 6. Отключение служб по умолчанию
-for s in ssclash zapret zapret2 watchcat ddns fptn lalune; do
+# 8. Отключение служб по умолчанию
+for s in ssclash zapret zapret2 watchcat ddns fptn lalune collectd; do
     if [ -f "/etc/init.d/$s" ]; then
         /etc/init.d/$s disable 2>/dev/null || true
         /etc/init.d/$s stop 2>/dev/null || true
@@ -41,73 +57,13 @@ uci set zapret.config.enabled='0' 2>/dev/null || true
 uci commit zapret 2>/dev/null || true
 uci set watchcat.@watchcat[0].disabled='1' 2>/dev/null || true
 uci commit watchcat 2>/dev/null || true
-
-# 7. Очистка зеркал пакетов от 404 ссылок
-sed -i '/\/awg\//d; /\/zapret\//d; /\/zapret2\//d; /\/netbird_luci\//d' /etc/apk/repositories.d/* /etc/apk/repositories 2>/dev/null || true
-
-exit 0
-
-# 8. Отключение DHCPv6-клиента (wan6), удаление DUID и отключение collectd
-uci -q delete network.globals.duid 2>/dev/null || true
-uci -q delete network.wan6.duid 2>/dev/null || true
-uci commit network 2>/dev/null || true
-
-uci -q delete dhcp.wan6 2>/dev/null || true
-uci commit dhcp 2>/dev/null || true
-
-if [ -f "/etc/init.d/collectd" ]; then
-    /etc/init.d/collectd disable 2>/dev/null || true
-    /etc/init.d/collectd stop 2>/dev/null || true
-fi
-
-# Полное удаление интерфейса wan6 (DHCPv6) и DUID
-uci -q delete network.wan6 2>/dev/null || true
-uci -q delete dhcp.wan6 2>/dev/null || true
-uci -q delete network.globals.duid 2>/dev/null || true
-uci commit network 2>/dev/null || true
-uci commit dhcp 2>/dev/null || true
-
-# Полное отключение collectd и luci_statistics
 uci set luci_statistics.collectd.enable='0' 2>/dev/null || true
 uci commit luci_statistics 2>/dev/null || true
 
-/etc/init.d/collectd disable 2>/dev/null || true
-/etc/init.d/collectd stop 2>/dev/null || true
-/etc/init.d/luci_statistics disable 2>/dev/null || true
-/etc/init.d/luci_statistics stop 2>/dev/null || true
-killall -9 collectd 2>/dev/null || true
+# 9. Очистка репозиториев apk от 404 ссылок
+sed -i '/\/awg\//d; /\/zapret\//d; /\/zapret2\//d; /\/netbird_luci\//d' /etc/apk/repositories.d/* /etc/apk/repositories 2>/dev/null || true
 
-# Генерация fstab и исправление ip6assign
+# 10. Точки монтирования fstab
 [ -f /etc/config/fstab ] || block detect > /etc/config/fstab 2>/dev/null || true
-uci set network.lan.ip6assign='60' 2>/dev/null || true
-uci commit network 2>/dev/null || true
 
-# Блокировка загрузки драйвера AIoT антенны
-echo "blacklist ath10k_pci" > /etc/modules.d/99-disable-aiot
-
-# Настройка Wi-Fi beacon (страна RU и WMM для 802.11ax)
-for r in radio0 radio1; do
-    uci set wireless.${r}.country='RU' 2>/dev/null || true
-done
-for i in $(uci -q show wireless | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
-    uci set wireless.${i}.wmm='1' 2>/dev/null || true
-done
-uci commit wireless 2>/dev/null || true
-
-# Буфер ядра для nlbwmon
-sysctl -w net.core.rmem_max=16777216 2>/dev/null || true
-sysctl -w net.core.rmem_default=524288 2>/dev/null || true
-
-# Имя хоста роутера: ax3600
-uci set system.@system[0].hostname='ax3600' 2>/dev/null || true
-uci commit system 2>/dev/null || true
-
-# Полное стирание wan6 и удаление из зоны фаервола
-uci -q delete network.wan6 2>/dev/null || true
-for z in $(uci -q show firewall | grep "network.*wan6" | cut -d. -f2); do
-    uci -q del_list firewall.${z}.network='wan6' 2>/dev/null || true
-done
-uci -q delete dhcp.wan6 2>/dev/null || true
-uci commit network 2>/dev/null || true
-uci commit firewall 2>/dev/null || true
-uci commit dhcp 2>/dev/null || true
+exit 0
