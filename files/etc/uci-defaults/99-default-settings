@@ -97,3 +97,7 @@ uci commit wireless 2>/dev/null || true
 # Буфер ядра для nlbwmon
 sysctl -w net.core.rmem_max=16777216 2>/dev/null || true
 sysctl -w net.core.rmem_default=524288 2>/dev/null || true
+
+# Имя хоста роутера: ax3600
+uci set system.@system[0].hostname='ax3600' 2>/dev/null || true
+uci commit system 2>/dev/null || true
