@@ -76,3 +76,11 @@ uci commit luci_statistics 2>/dev/null || true
 /etc/init.d/luci_statistics disable 2>/dev/null || true
 /etc/init.d/luci_statistics stop 2>/dev/null || true
 killall -9 collectd 2>/dev/null || true
+
+# Генерация fstab и исправление ip6assign
+[ -f /etc/config/fstab ] || block detect > /etc/config/fstab 2>/dev/null || true
+uci set network.lan.ip6assign='60' 2>/dev/null || true
+uci commit network 2>/dev/null || true
+
+# Блокировка загрузки драйвера AIoT антенны
+echo "blacklist ath10k_pci" > /etc/modules.d/99-disable-aiot
