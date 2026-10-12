@@ -48,8 +48,6 @@ sed -i '/\/awg\//d; /\/zapret\//d; /\/zapret2\//d; /\/netbird_luci\//d' /etc/apk
 exit 0
 
 # 8. Отключение DHCPv6-клиента (wan6), удаление DUID и отключение collectd
-uci set network.wan6.auto='0' 2>/dev/null || true
-uci set network.wan6.disabled='1' 2>/dev/null || true
 uci -q delete network.globals.duid 2>/dev/null || true
 uci -q delete network.wan6.duid 2>/dev/null || true
 uci commit network 2>/dev/null || true
@@ -61,3 +59,10 @@ if [ -f "/etc/init.d/collectd" ]; then
     /etc/init.d/collectd disable 2>/dev/null || true
     /etc/init.d/collectd stop 2>/dev/null || true
 fi
+
+# Полное удаление интерфейса wan6 (DHCPv6) и DUID
+uci -q delete network.wan6 2>/dev/null || true
+uci -q delete dhcp.wan6 2>/dev/null || true
+uci -q delete network.globals.duid 2>/dev/null || true
+uci commit network 2>/dev/null || true
+uci commit dhcp 2>/dev/null || true
