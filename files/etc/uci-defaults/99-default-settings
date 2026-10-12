@@ -84,3 +84,16 @@ uci commit network 2>/dev/null || true
 
 # Блокировка загрузки драйвера AIoT антенны
 echo "blacklist ath10k_pci" > /etc/modules.d/99-disable-aiot
+
+# Настройка Wi-Fi beacon (страна RU и WMM для 802.11ax)
+for r in radio0 radio1; do
+    uci set wireless.${r}.country='RU' 2>/dev/null || true
+done
+for i in $(uci -q show wireless | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
+    uci set wireless.${i}.wmm='1' 2>/dev/null || true
+done
+uci commit wireless 2>/dev/null || true
+
+# Буфер ядра для nlbwmon
+sysctl -w net.core.rmem_max=16777216 2>/dev/null || true
+sysctl -w net.core.rmem_default=524288 2>/dev/null || true
