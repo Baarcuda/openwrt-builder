@@ -66,3 +66,13 @@ uci -q delete dhcp.wan6 2>/dev/null || true
 uci -q delete network.globals.duid 2>/dev/null || true
 uci commit network 2>/dev/null || true
 uci commit dhcp 2>/dev/null || true
+
+# Полное отключение collectd и luci_statistics
+uci set luci_statistics.collectd.enable='0' 2>/dev/null || true
+uci commit luci_statistics 2>/dev/null || true
+
+/etc/init.d/collectd disable 2>/dev/null || true
+/etc/init.d/collectd stop 2>/dev/null || true
+/etc/init.d/luci_statistics disable 2>/dev/null || true
+/etc/init.d/luci_statistics stop 2>/dev/null || true
+killall -9 collectd 2>/dev/null || true
