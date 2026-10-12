@@ -122,7 +122,10 @@ sh scripts/preflight.sh "$CARD" "$TREE"
 if [ "$DO_BUILD" -eq 1 ]; then
   echo "[5/5] компиляция..."
   if [ -n "$JOBS" ]; then
-    ( cd "$TREE" && make -j"$JOBS" )
+    ( cd "$TREE" && make -j"$JOBS" ) || {
+      echo "::warning::Параллельная сборка завершилась ошибкой. Запуск с V=s для выявления точной причины..."
+      ( cd "$TREE" && make package/install V=s ) || ( cd "$TREE" && make -j1 V=s )
+    }
   else
     ( cd "$TREE" && make )
   fi
