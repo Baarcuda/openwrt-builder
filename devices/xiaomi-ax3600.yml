@@ -3,5 +3,5 @@ target: qualcommax
 subtarget: ipq807x
 profile: xiaomi_ax3600
 arch: aarch64_cortex-a53
-ref: f0a60eee2fe051741c643ea6118718aae1ef17fb
-ref_name: v25.12.5
+ref: 58efa9917d4cc53fceed173529a286187649e827
+ref_name: 25.12-latest

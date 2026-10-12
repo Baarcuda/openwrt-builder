@@ -42,7 +42,19 @@ else
   echo "[1/5] клонирую OpenWrt..."
   git clone https://git.openwrt.org/openwrt/openwrt.git "$TREE"
 fi
-git -C "$TREE" checkout --detach "$REF"
+git -C "$TREE" checkout -f --detach "$REF"
+
+# Активация бэкендов LZ4 и ZSTD в ядре Linux 6.12 для ZRAM
+for kcfg in "$TREE/target/linux/qualcommax/config-6.12" "$TREE/target/linux/generic/config-6.12"; do
+  if [ -f "$kcfg" ]; then
+    grep -q "CONFIG_ZRAM_BACKEND_LZ4=y" "$kcfg" || cat << "KCONF" >> "$kcfg"
+CONFIG_ZRAM_BACKEND_LZ4=y
+CONFIG_ZRAM_BACKEND_ZSTD=y
+CONFIG_LZ4_COMPRESS=y
+CONFIG_LZ4_DECOMPRESS=y
+KCONF
+  fi
+done
 
 # 2. Подключение сторонних фидов и пакетов
 if [ -f "$BUILDER_DIR/custom_feeds.conf" ]; then
