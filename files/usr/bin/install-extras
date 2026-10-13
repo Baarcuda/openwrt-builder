@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+
+ARCH="aarch64_cortex-a53"
+
+log() { echo "==> $1"; }
+err() { echo "!! Ошибка: $1" >&2; exit 1; }
+
+install_mosdns() {
+    log "Установка MosDNS v5 + LuCI (OpenWrt 25.12)..."
+    TMP_DIR=$(mktemp -d)
+    TAR_URL="https://github.com/sbwml/luci-app-mosdns/releases/latest/download/${ARCH}-openwrt-25.12.tar.gz"
+    
+    log "Загрузка архива пакетов..."
+    if ! curl -sL --connect-timeout 10 -m 300 "$TAR_URL" -o "$TMP_DIR/mosdns.tar.gz"; then
+        rm -rf "$TMP_DIR"
+        err "Не удалось скачать архив MosDNS с GitHub"
+    fi
+
+    tar -xzf "$TMP_DIR/mosdns.tar.gz" -C "$TMP_DIR"
+    
+    if [ -x /usr/bin/apk ]; then
+        log "Установка через apk..."
+        apk add --allow-untrusted "$TMP_DIR"/*.apk 2>/dev/null || apk add --allow-untrusted "$TMP_DIR"/*/*.apk 2>/dev/null || true
+    elif [ -x /bin/opkg ]; then
+        log "Установка через opkg..."
+        opkg install --force-downgrade "$TMP_DIR"/*.ipk 2>/dev/null || true
+    fi
+
+    rm -rf "$TMP_DIR"
+    /etc/init.d/mosdns enable 2>/dev/null || true
+    log "MosDNS успешно установлен. Доступен в LuCI: 'Службы' -> 'MosDNS'."
+}
+
+install_lalune() {
+    log "Установка LaLune ARM64..."
+    LL_URL="https://github.com/lalune-project/lalune/releases/latest/download/lalune-linux-arm64"
+    if curl -sL --connect-timeout 10 -m 180 "$LL_URL" -o /usr/bin/lalune; then
+        chmod +x /usr/bin/lalune
+        log "LaLune установлен в /usr/bin/lalune."
+    else
+        err "Не удалось загрузить бинарник LaLune"
+    fi
+}
+
+case "${1:-}" in
+    mosdns)
+        install_mosdns
+        ;;
+    lalune)
+        install_lalune
+        ;;
+    all)
+        install_mosdns
+        install_lalune
+        ;;
+    *)
+        echo "Использование: install-extras <mosdns|lalune|all>"
+        exit 1
+        ;;
+esac
