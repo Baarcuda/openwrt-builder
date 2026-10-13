@@ -41,13 +41,7 @@ if [ ! -f /etc/wifi_configured_done ]; then
     touch /etc/wifi_configured_done
 fi
 
-# 2. Аппаратное обесточивание AIoT PCIe (0000:01:00.0) и светодиода (при КАЖДОЙ загрузке)
-if [ -d "/sys/bus/pci/devices/0000:01:00.0" ]; then
-    [ -d "/sys/bus/pci/drivers/ath10k_pci" ] && echo "0000:01:00.0" > /sys/bus/pci/drivers/ath10k_pci/unbind 2>/dev/null || true
-    echo 1 > "/sys/bus/pci/devices/0000:01:00.0/remove" 2>/dev/null || true
-    rmmod ath10k_pci ath10k_core 2>/dev/null || true
-fi
-
+# 2. Отключение светодиода AIoT (если присутствует в sysfs)
 for d in /sys/class/leds/*aiot*; do
     [ -d "$d" ] || continue
     echo none > "$d/trigger" 2>/dev/null || true
