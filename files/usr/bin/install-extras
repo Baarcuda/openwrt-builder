@@ -7,29 +7,19 @@ log() { echo "==> $1"; }
 err() { echo "!! Ошибка: $1" >&2; exit 1; }
 
 install_mosdns() {
-    log "Установка MosDNS v5 + LuCI (OpenWrt 25.12)..."
-    TMP_DIR=$(mktemp -d)
-    TAR_URL="https://github.com/sbwml/luci-app-mosdns/releases/latest/download/${ARCH}-openwrt-25.12.tar.gz"
+    log "Установка MosDNS v5 + LuCI (официальный мульти-архитектурный скрипт)..."
+    INSTALL_URL="https://raw.githubusercontent.com/sbwml/luci-app-mosdns/v5/install.sh"
+    TMP_SH=$(mktemp)
     
-    log "Загрузка архива пакетов..."
-    if ! curl -sLf --connect-timeout 10 -m 300 "$TAR_URL" -o "$TMP_DIR/mosdns.tar.gz"; then
-        rm -rf "$TMP_DIR"
-        err "Не удалось скачать архив MosDNS с GitHub"
+    if curl -sLf --connect-timeout 10 -m 60 "$INSTALL_URL" -o "$TMP_SH"; then
+        sh "$TMP_SH" "$@"
+        rm -f "$TMP_SH"
+        /etc/init.d/mosdns enable 2>/dev/null || true
+        log "MosDNS успешно установлен. Доступен в LuCI: 'Службы' -> 'MosDNS'."
+    else
+        rm -f "$TMP_SH"
+        err "Не удалось загрузить скрипт установки MosDNS с GitHub"
     fi
-
-    tar -xzf "$TMP_DIR/mosdns.tar.gz" -C "$TMP_DIR"
-    
-    if [ -x /usr/bin/apk ]; then
-        log "Установка через apk..."
-        apk add --allow-untrusted "$TMP_DIR"/*.apk 2>/dev/null || apk add --allow-untrusted "$TMP_DIR"/*/*.apk 2>/dev/null || true
-    elif [ -x /bin/opkg ]; then
-        log "Установка через opkg..."
-        opkg install --force-downgrade "$TMP_DIR"/*.ipk 2>/dev/null || true
-    fi
-
-    rm -rf "$TMP_DIR"
-    /etc/init.d/mosdns enable 2>/dev/null || true
-    log "MosDNS успешно установлен. Доступен в LuCI: 'Службы' -> 'MosDNS'."
 }
 
 install_fptn() {
@@ -121,13 +111,16 @@ install_ssclash() {
 
 case "${1:-}" in
     mosdns)
-        install_mosdns
+        shift
+        install_mosdns "$@"
         ;;
     fptn)
-        install_fptn
+        shift
+        install_fptn "$@"
         ;;
     lalune)
-        install_lalune
+        shift
+        install_lalune "$@"
         ;;
     ssclash|ssclashgo)
         shift
