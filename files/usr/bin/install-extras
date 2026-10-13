@@ -77,7 +77,6 @@ install_lalune() {
         err "Не удалось загрузить скрипт установки LaLune с GitHub"
     fi
 
-    # Генерация procd-службы для гарантированного автозапуска после перезагрузки
     log "Регистрация службы автозагрузки /etc/init.d/lalune..."
     cat << 'EOF' > /etc/init.d/lalune
 #!/bin/sh /etc/rc.common
@@ -105,6 +104,21 @@ EOF
     log "Подключение в UI: 'Настройки' -> 'Экспериментальное' -> 'Роутеры' -> 'Подключить OpenWRT'."
 }
 
+install_ssclash() {
+    log "Установка SSClash-Go (Mihomo core + UI на :9091)..."
+    INSTALL_URL="https://github.com/zerolabnet/SSClash-Go/raw/refs/heads/main/install-ssclash-go.sh"
+    TMP_SH=$(mktemp)
+    
+    if curl -sLf --connect-timeout 10 -m 60 "$INSTALL_URL" -o "$TMP_SH"; then
+        ash "$TMP_SH" "$@"
+        rm -f "$TMP_SH"
+        log "SSClash-Go успешно установлен. Панель управления доступна на порту :9091."
+    else
+        rm -f "$TMP_SH"
+        err "Не удалось загрузить скрипт установки SSClash-Go с GitHub"
+    fi
+}
+
 case "${1:-}" in
     mosdns)
         install_mosdns
@@ -115,13 +129,18 @@ case "${1:-}" in
     lalune)
         install_lalune
         ;;
+    ssclash|ssclashgo)
+        shift
+        install_ssclash "$@"
+        ;;
     all)
         install_mosdns
         install_fptn
         install_lalune
+        install_ssclash
         ;;
     *)
-        echo "Использование: install-extras <mosdns|fptn|lalune|all>"
+        echo "Использование: install-extras <mosdns|fptn|lalune|ssclash|all> [параметры]"
         exit 1
         ;;
 esac

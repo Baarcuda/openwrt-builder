@@ -91,25 +91,11 @@ fi
 # 4. Подготовка файлов образа (чистый оверлей)
 echo "[4/5] подготовка файлов образа..."
 rm -rf "$TREE/files"
-mkdir -p "$TREE/files/opt/clash/bin" "$TREE/files/etc/init.d" "$TREE/files/usr/bin"
+mkdir -p "$TREE/files/etc/init.d" "$TREE/files/usr/bin"
 
 if [ -d "$BUILDER_DIR/files" ]; then
   cp -a "$BUILDER_DIR/files/." "$TREE/files/"
 fi
-
-# Скачивание SSClash-Go
-echo "      загрузка SSClash-Go..."
-if curl -sLf https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-linux-arm64 -o "$TREE/files/opt/clash/bin/ssclash"; then
-  chmod 0755 "$TREE/files/opt/clash/bin/ssclash"
-else
-  echo "::warning::Не удалось загрузить бинарник SSClash-Go"
-fi
-
-TMP_SERVICE=$(mktemp -d)
-if curl -sLf https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-openwrt-service.tar.gz -o "$TMP_SERVICE/service.tar.gz"; then
-  tar -xzf "$TMP_SERVICE/service.tar.gz" -C "$TREE/files/"
-fi
-rm -rf "$TMP_SERVICE"
 
 # Гарантированная нормализация прав доступа оверлея
 [ -d "$TREE/files/etc/init.d" ] && chmod 0755 "$TREE/files/etc/init.d"/* 2>/dev/null || true
