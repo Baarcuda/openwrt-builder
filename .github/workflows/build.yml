@@ -46,7 +46,7 @@ jobs:
             gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
             python3-setuptools rsync unzip zlib1g-dev file wget curl
 
-      - name: Определение параметров устройства и версии
+      -- name: Определение параметров устройства и версии
         id: info
         run: |
           if [ "${{ inputs.device }}" = "custom" ]; then
@@ -60,6 +60,14 @@ jobs:
           fi
           echo "card=$CARD" >> $GITHUB_OUTPUT
 
+          case "${{ inputs.device }}" in
+            xiaomi-ax3600) DEV_NAME="Xiaomi-AX3600" ;;
+            xiaomi-ax6000) DEV_NAME="Xiaomi-AX6000" ;;
+            xiaomi-ax6s)   DEV_NAME="Xiaomi-AX6S" ;;
+            *)             DEV_NAME="${{ inputs.device }}" ;;
+          esac
+          echo "dev_name=$DEV_NAME" >> $GITHUB_OUTPUT
+
           VERSION=$(grep -E '^ref_name:' "$CARD" | awk '{print $2}' | sed -e 's/#.*//' -e 's/[^a-zA-Z0-9._-]//g')
           if [ -z "$VERSION" ]; then
             VERSION=$(grep -E '^ref:' "$CARD" | awk '{print $2}' | sed 's/[^a-zA-Z0-9._-]//g' | cut -c1-8)
@@ -67,8 +75,10 @@ jobs:
           [ -z "$VERSION" ] && VERSION="snapshot"
 
           BUILD_DATE=$(date +'%Y%m%d')
+          RELEASE_DATE=$(date +'%m.%d.%y')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
 
       - name: Сборка прошивки через build-one.sh
         run: |
@@ -102,9 +112,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.device }}-${{ steps.info.outputs.version }}-${{ steps.info.outputs.build_date }}
-          name: "OpenWrt ${{ steps.info.outputs.version }} — ${{ inputs.device }} (${{ steps.info.outputs.build_date }})"
+          name: "${{ steps.info.outputs.dev_name }} OpenWrt ${{ steps.info.outputs.version }} (${{ steps.info.outputs.release_date }})"
           body: |
-            ## Релиз OpenWrt 25.12 для ${{ inputs.device }}
+            ## Релиз OpenWrt 25.12 для ${{ steps.info.outputs.dev_name }}
 
             * **Базовый коммит:** `58efa9917d4cc53fceed173529a286187649e827` (тег `${{ steps.info.outputs.version }}`)
             * **Ядро Linux:** 6.12.112 (ARM64 Cortex-A53)
