@@ -106,12 +106,8 @@ jobs:
           body: |
             ## Релиз OpenWrt 25.12 для ${{ inputs.device }}
 
-            * **Базовый коммит:** `58efa9917d4cc53fceed173529a286187649e827` (тег `25.12-latest`)
+            * **Базовый коммит:** `58efa9917d4cc53fceed173529a286187649e827` (тег `${{ steps.info.outputs.version }}`)
             * **Ядро Linux:** 6.12.112 (ARM64 Cortex-A53)
-            * **Пакетная база:** `apk-tools v3` (OpenWrt 25.12)
-            * **Flash-статус AX3600:** ~20.0 МБ (запас Flash > 15.7 МБ)
-            * **Модули ядра:** BBR, LZ4 ZRAM, AmneziaWG, WireGuard, OpenVPN, nftables TProxy
-            * **Службы оверлея:** устанавливаются на роутере через `/usr/bin/install-extras`
 
             ### Контрольные суммы SHA-256
             Файл `sha256sums` прикреплён к релизу.
