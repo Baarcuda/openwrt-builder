@@ -1,26 +1,36 @@
 #!/bin/sh
 
-# 1. Автоматическая настройка Wi-Fi при первой загрузке (после старта ath11k)
+# 1. Автоматическая настройка Wi-Fi при первой загрузке
 if [ ! -f /etc/wifi_configured_done ]; then
     sleep 4
     wifi config 2>/dev/null
 
-    # Включаем только основные сети: radio0 (2.4G) и radio1 (5G)
+    BOARD_NAME=$(cat /tmp/sysinfo/board_name 2>/dev/null || echo "")
+    case "$BOARD_NAME" in
+        *ax3600*)  SSID_NAME="ax3600" ;;
+        *ax6000*)  SSID_NAME="ax6000" ;;
+        *ax6s*)    SSID_NAME="ax6s" ;;
+        *)         SSID_NAME="OpenWrt" ;;
+    esac
+
+    # Включаем radio0 и radio1
     uci set wireless.radio0.disabled='0' 2>/dev/null || true
     uci set wireless.radio1.disabled='0' 2>/dev/null || true
 
-    # Намертво выключаем AIoT-антенну (radio2)
-    uci set wireless.radio2.disabled='1' 2>/dev/null || true
-    for iface in $(uci -q show wireless | grep "device='radio2'" | cut -d. -f2); do
-        uci set wireless.${iface}.disabled='1' 2>/dev/null || true
-    done
+    # Для AX3600: отключаем AIoT антенну (radio2)
+    if echo "$BOARD_NAME" | grep -q "ax3600"; then
+        uci set wireless.radio2.disabled='1' 2>/dev/null || true
+        for iface in $(uci -q show wireless | grep "device='radio2'" | cut -d. -f2); do
+            uci set wireless.${iface}.disabled='1' 2>/dev/null || true
+        done
+    fi
 
-    # Настраиваем Wi-Fi сети 2.4G и 5G: имя ax3600, пароль 12345678
+    # Задаем SSID и WPA2-PSK
     for iface in $(uci -q show wireless | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
         dev=$(uci -q get wireless.${iface}.device)
         if [ "$dev" = "radio0" ] || [ "$dev" = "radio1" ]; then
             uci set wireless.${iface}.disabled='0'
-            uci set wireless.${iface}.ssid='ax3600'
+            uci set wireless.${iface}.ssid="$SSID_NAME"
             uci set wireless.${iface}.encryption='psk2'
             uci set wireless.${iface}.key='12345678'
         fi
@@ -28,11 +38,11 @@ if [ ! -f /etc/wifi_configured_done ]; then
 
     uci commit wireless
     wifi reload 2>/dev/null || true
-    wifi down radio2 2>/dev/null || true
+    [ "$SSID_NAME" = "ax3600" ] && wifi down radio2 2>/dev/null || true
     touch /etc/wifi_configured_done
 fi
 
-# 2. Полное отключение светодиода AIoT (снятие триггера ядра)
+# 2. Отключение светодиода AIoT (если присутствует в sysfs)
 for d in /sys/class/leds/*aiot*; do
     [ -d "$d" ] || continue
     echo none > "$d/trigger" 2>/dev/null || true

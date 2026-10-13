@@ -1,7 +1,15 @@
 #!/bin/sh
 
-# 1. Имя хоста роутера: ax3600
-uci set system.@system[0].hostname='ax3600'
+# 1. Определение модели устройства и установка hostname
+BOARD_NAME=$(cat /tmp/sysinfo/board_name 2>/dev/null || echo "")
+case "$BOARD_NAME" in
+    *ax3600*)  HN="ax3600" ;;
+    *ax6000*)  HN="ax6000" ;;
+    *ax6s*)    HN="ax6s" ;;
+    *)         HN="OpenWrt" ;;
+esac
+
+uci set system.@system[0].hostname="$HN"
 uci commit system
 
 # 2. IP адрес LAN: 192.168.10.1 и сетевой стек
@@ -66,7 +74,16 @@ sed -i '/\/awg\//d; /\/zapret\//d; /\/zapret2\//d; /\/netbird_luci\//d' /etc/apk
 # 10. Точки монтирования fstab
 [ -f /etc/config/fstab ] || block detect > /etc/config/fstab 2>/dev/null || true
 
-# Полная блокировка запуска collectd
+# 11. Настройка Wi-Fi параметров по умолчанию (страна RU и WMM)
+for r in $(uci -q show wireless | grep '=wifi-device' | cut -d. -f2 | cut -d= -f1); do
+    uci set wireless.${r}.country='RU' 2>/dev/null || true
+done
+for i in $(uci -q show wireless | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
+    uci set wireless.${i}.wmm='1' 2>/dev/null || true
+done
+uci commit wireless 2>/dev/null || true
+
+# 12. Полная блокировка запуска collectd
 chmod -x /usr/sbin/collectd 2>/dev/null || true
 rm -f /etc/rc.d/*luci_statistics* /etc/rc.d/*collectd* 2>/dev/null || true
 

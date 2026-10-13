@@ -44,8 +44,8 @@ else
 fi
 git -C "$TREE" checkout -f --detach "$REF"
 
-# Активация бэкендов LZ4 и ZSTD в ядре Linux 6.12 для ZRAM
-for kcfg in "$TREE/target/linux/qualcommax/config-6.12" "$TREE/target/linux/generic/config-6.12"; do
+# Активация бэкендов LZ4 и ZSTD в ядре Linux 6.12 для ZRAM (целевой таргет + generic)
+for kcfg in "$TREE/target/linux/$TARGET/config-6.12" "$TREE/target/linux/generic/config-6.12"; do
   if [ -f "$kcfg" ]; then
     grep -q "CONFIG_ZRAM_BACKEND_LZ4=y" "$kcfg" || cat << "KCONF" >> "$kcfg"
 CONFIG_ZRAM_BACKEND_LZ4=y
@@ -56,7 +56,7 @@ KCONF
   fi
 done
 
-# 2. Подключение сторонних фидов и пакетов
+# 2. Подключение сторонних фидов
 if [ -f "$BUILDER_DIR/custom_feeds.conf" ]; then
   echo "[2/5] добавление custom_feeds.conf..."
   while IFS= read -r line || [ -n "$line" ]; do
@@ -73,12 +73,6 @@ fi
 
 echo "[2/5] обновление и установка feeds..."
 ( cd "$TREE" && ./scripts/feeds update -a && ./scripts/feeds install -a )
-
-# Клонируем исходники luci-app-netbird прямо в дерево пакетов
-if [ ! -d "$TREE/package/luci-app-netbird" ]; then
-  echo "      клонирование пакета luci-app-netbird в package/..."
-  git clone --depth 1 https://github.com/looong-cat/luci-app-netbird.git "$TREE/package/luci-app-netbird"
-fi
 
 # 3. Формирование .config
 echo "[3/5] генерация .config..."
@@ -109,33 +103,33 @@ chmod +x "$TREE/files/opt/clash/bin/ssclash"
 curl -sL https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-openwrt-service.tar.gz | tar -xz -C "$TREE/files/"
 chmod +x "$TREE/files/etc/init.d/ssclash"
 
-# Загрузка и распаковка FPTN (бинарник + LuCI в одном пакете)
+# Загрузка и распаковка FPTN (ARM64 + LuCI)
 echo "      загрузка FPTN (ARM64 + LuCI)..."
 FPTN_TAG=$(curl -sIL -o /dev/null -w "%{url_effective}" https://github.com/fptn-project/fptn/releases/latest | tr -d "\r" | awk -F"/" "{print \$NF}")
 [ -z "$FPTN_TAG" ] && FPTN_TAG="0.4.6"
 
 FPTN_IPK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-24.10.x-aarch64_cortex-a53.ipk"
-mkdir -p /tmp/fptn_extract
-if curl -sL "$FPTN_IPK" -o /tmp/fptn_extract/fptn.ipk; then
-    ( cd /tmp/fptn_extract && ar -x fptn.ipk 2>/dev/null || tar -xzf fptn.ipk 2>/dev/null || true )
-    if [ -f /tmp/fptn_extract/data.tar.gz ]; then
-        tar -xzf /tmp/fptn_extract/data.tar.gz -C "$TREE/files/"
+TMP_DIR=$(mktemp -d)
+if curl -sL "$FPTN_IPK" -o "$TMP_DIR/fptn.ipk"; then
+    ( cd "$TMP_DIR" && ar -x fptn.ipk 2>/dev/null || tar -xzf fptn.ipk 2>/dev/null || true )
+    if [ -f "$TMP_DIR/data.tar.gz" ]; then
+        tar -xzf "$TMP_DIR/data.tar.gz" -C "$TREE/files/"
         echo "      FPTN успешно распакован в files/"
-    elif [ -f /tmp/fptn_extract/data.tar ]; then
-        tar -xf /tmp/fptn_extract/data.tar -C "$TREE/files/"
+    elif [ -f "$TMP_DIR/data.tar" ]; then
+        tar -xf "$TMP_DIR/data.tar" -C "$TREE/files/"
         echo "      FPTN успешно распакован в files/"
     fi
 fi
-rm -rf /tmp/fptn_extract
+rm -rf "$TMP_DIR"
 
 sh scripts/preflight.sh "$CARD" "$TREE"
 
 # 5. Сборка
-if [ "$DO_BUILD" -eq 1 ]; then
+if [ "$DO_BUILD TARGET" ] && [ "$DO_BUILD" -eq 1 ]; then
   echo "[5/5] компиляция..."
   if [ -n "$JOBS" ]; then
     ( cd "$TREE" && make -j"$JOBS" ) || {
-      echo "::warning::Параллельная сборка завершилась ошибкой. Запуск с V=s для выявления точной причины..."
+      echo "::warning::Параллельная сборка упала. Fallback на V=s..."
       ( cd "$TREE" && make package/install V=s ) || ( cd "$TREE" && make -j1 V=s )
     }
   else
