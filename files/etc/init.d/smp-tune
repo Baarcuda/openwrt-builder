@@ -6,15 +6,25 @@ boot() {
     start
 }
 
+restart() {
+    start
+}
+
 start() {
+    # 0. Отключаем irqbalance, чтобы исключить сброс настроек affinity планировщиком
+    if [ -x /etc/init.d/irqbalance ]; then
+        /etc/init.d/irqbalance stop >/dev/null 2>&1 || true
+        /etc/init.d/irqbalance disable >/dev/null 2>&1 || true
+    fi
+
     CORES=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || echo 1)
 
     if [ "$CORES" -ge 4 ]; then
-        # 4 ядра (AX3600): Сеть на CPU 0,1 (маска 3); Сервисы на CPU 2,3 (маска c)
+        # 4 ядра (AX3600): Сеть и Wi-Fi на CPU 0,1 (маска 3); Приложения на CPU 2,3 (маска c)
         NET_MASK="3"
         APP_MASK="c"
     elif [ "$CORES" -ge 2 ]; then
-        # 2 ядра (AX6000 / AX6S): Сеть на CPU 0 (маска 1); Сервисы на CPU 1 (маска 2)
+        # 2 ядра (AX6000 / AX6S): Сеть на CPU 0 (маска 1); Приложения на CPU 1 (маска 2)
         NET_MASK="1"
         APP_MASK="2"
     else
@@ -22,20 +32,26 @@ start() {
         APP_MASK="1"
     fi
 
-    # 1. Привязка RPS (Receive Packet Steering) для интерфейсов к сетевым ядрам
+    # 1. Аппаратные прерывания Ethernet и Wi-Fi (ath11k, mt76, edma) на сетевые ядра
+    for irq in $(awk -F: '/ath11k|mt76|edma|eth/ {print $1}' /proc/interrupts 2>/dev/null | tr -d ' '); do
+        [ -f "/proc/irq/$irq/smp_affinity" ] && echo "$NET_MASK" > "/proc/irq/$irq/smp_affinity" 2>/dev/null || true
+    done
+
+    # 2. Привязка RPS (Receive Packet Steering) для всех интерфейсов к сетевым ядрам
     for rps in /sys/class/net/*/queues/rx-*/rps_cpus; do
         [ -f "$rps" ] && echo "$NET_MASK" > "$rps" 2>/dev/null || true
     done
 
-    # 2. Увеличение очереди передачи txqueuelen для виртуальных интерфейсов (TUN/TAP)
-    for iface in wt0 fptn0 tun0; do
+    # 3. Увеличение очереди передачи txqueuelen для виртуальных интерфейсов (TUN/TAP/VPN)
+    for iface in clash-tun wt0 fptn0 tun0 awg0 wg0; do
         if [ -d "/sys/class/net/$iface" ]; then
             ip link set dev "$iface" txqueuelen 2500 2>/dev/null || true
         fi
     done
 
-    # 3. Привязка процессов (Affinity) к выделенным ядрам
-    for proc in ssclash fptn nfqws netbird mosdns csqtt lalune; do
+    # 4. Привязка процессов (Affinity) к выделенным ядрам приложений
+    # Включает: Mihomo/SSClash, FPTN, Zapret/Zapret2 (nfqws/nfqws2), NetBird, MosDNS, LaLune (csqtt/lalune)
+    for proc in clash mihomo ssclash fptn nfqws nfqws2 netbird mosdns csqtt lalune; do
         for pid in $(pidof "$proc" 2>/dev/null); do
             taskset -p "$APP_MASK" "$pid" 2>/dev/null || true
         done

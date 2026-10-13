@@ -25,19 +25,20 @@ install_mosdns() {
 install_fptn() {
     log "Установка FPTN клиента (OpenWrt 25.12 APK)..."
     TMP_DIR=$(mktemp -d)
-    
-    FPTN_TAG=$(curl -sIL -o /dev/null -w "%{url_effective}" https://github.com/fptn-project/fptn/releases/latest | tr -d "\r\n" | awk -F/ '{print $NF}')
+
+    # Получаем последний стабильный тег с GitHub, при сбое сети используем fallback 0.4.6
+    FPTN_TAG=$(curl -sIL -o /dev/null -w "%{url_effective}" --connect-timeout 5 -m 15 https://github.com/fptn-project/fptn/releases/latest 2>/dev/null | tr -d "\r\n" | awk -F/ '{print $NF}')
     [ -n "$FPTN_TAG" ] || FPTN_TAG="0.4.6"
 
-    FPTN_APK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-25.12.x-aarch64_cortex-a53.apk"
-    log "Загрузка FPTN ${FPTN_TAG} (.apk для 25.12)..."
-    
+    FPTN_APK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-25.12.x-${ARCH}.apk"
+    log "Загрузка FPTN ${FPTN_TAG} (.apk для 25.12, архитектура: ${ARCH})..."
+
     if curl -sLf --connect-timeout 10 -m 300 "$FPTN_APK" -o "$TMP_DIR/fptn.apk"; then
         log "Установка через нативный apk..."
         apk add --allow-untrusted "$TMP_DIR/fptn.apk"
     else
         log "Fallback: загрузка IPK для 24.10..."
-        FPTN_IPK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-24.10.x-aarch64_cortex-a53.ipk"
+        FPTN_IPK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-24.10.x-${ARCH}.ipk"
         if ! curl -sLf --connect-timeout 10 -m 300 "$FPTN_IPK" -o "$TMP_DIR/fptn.ipk"; then
             rm -rf "$TMP_DIR"
             err "Не удалось загрузить пакет FPTN с GitHub"
@@ -168,3 +169,8 @@ case "${1:-}" in
         exit 1
         ;;
 esac
+
+# Применяем изоляцию ядер CPU (smp-tune) для свежеустановленных процессов
+if [ -x /etc/init.d/smp-tune ]; then
+    /etc/init.d/smp-tune restart >/dev/null 2>&1 || true
+fi

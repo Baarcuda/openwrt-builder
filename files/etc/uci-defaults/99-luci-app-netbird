@@ -12,6 +12,10 @@ CONFIG_FILE="/etc/config/netbird"
 DEFAULTS_TEMPLATE="/usr/share/luci-app-netbird/defaults/netbird.uci"
 TAG="luci-app-netbird"
 
+# Защита: если шаблон пакета отсутствует (NetBird ещё не установлен через install-extras),
+# выходим сразу с кодом 0, чтобы не создавать битый конфиг и не засорять логи.
+[ -f "$DEFAULTS_TEMPLATE" ] || exit 0
+
 # ── 版本路由决策 ───────────────────────────────────────────────────────────────
 # 路由匹配用 'schema v' + 版本号前缀；'first cut' 等描述后缀忽略
 
