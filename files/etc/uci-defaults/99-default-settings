@@ -94,6 +94,8 @@ rm -f /etc/rc.d/*luci_statistics* /etc/rc.d/*collectd* 2>/dev/null || true
 # Немедленное применение sysctl сетевых буферов до старта демонов
 sysctl -p /etc/sysctl.d/99-optimization.conf 2>/dev/null || true
 
+/etc/init.d/smp-tune enable 2>/dev/null || true
+
 exit 0
 
 # 13. Оптимизация ядра и Go Runtime под объем памяти
@@ -107,6 +109,7 @@ fi
 
 # Окружение для NetBird
 mkdir -p /etc
+grep -qxF "NB_ENABLE_EXPERIMENTAL_LAZY_CONN=true" /etc/netbird.env 2>/dev/null || echo "NB_ENABLE_EXPERIMENTAL_LAZY_CONN=true" >> /etc/netbird.env
 grep -qxF "GOMEMLIMIT=" /etc/netbird.env 2>/dev/null || echo "GOMEMLIMIT=${GO_MEM}" >> /etc/netbird.env
 grep -qxF "GOGC=50" /etc/netbird.env 2>/dev/null || echo "GOGC=50" >> /etc/netbird.env
 grep -qxF "GODEBUG=madvdontneed=1" /etc/netbird.env 2>/dev/null || echo "GODEBUG=madvdontneed=1" >> /etc/netbird.env

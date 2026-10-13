@@ -1,0 +1,43 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+boot() {
+    start
+}
+
+start() {
+    CORES=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || echo 1)
+
+    if [ "$CORES" -ge 4 ]; then
+        # 4 ядра (AX3600): Сеть на CPU 0,1 (маска 3); Сервисы на CPU 2,3 (маска c)
+        NET_MASK="3"
+        APP_MASK="c"
+    elif [ "$CORES" -ge 2 ]; then
+        # 2 ядра (AX6000 / AX6S): Сеть на CPU 0 (маска 1); Сервисы на CPU 1 (маска 2)
+        NET_MASK="1"
+        APP_MASK="2"
+    else
+        NET_MASK="1"
+        APP_MASK="1"
+    fi
+
+    # 1. Привязка RPS (Receive Packet Steering) для интерфейсов к сетевым ядрам
+    for rps in /sys/class/net/*/queues/rx-*/rps_cpus; do
+        [ -f "$rps" ] && echo "$NET_MASK" > "$rps" 2>/dev/null || true
+    done
+
+    # 2. Увеличение очереди передачи txqueuelen для виртуальных интерфейсов (TUN/TAP)
+    for iface in wt0 fptn0 tun0; do
+        if [ -d "/sys/class/net/$iface" ]; then
+            ip link set dev "$iface" txqueuelen 2500 2>/dev/null || true
+        fi
+    done
+
+    # 3. Привязка процессов (Affinity) к выделенным ядрам
+    for proc in ssclash fptn nfqws netbird; do
+        for pid in $(pidof "$proc" 2>/dev/null); do
+            taskset -p "$APP_MASK" "$pid" 2>/dev/null || true
+        done
+    done
+}
