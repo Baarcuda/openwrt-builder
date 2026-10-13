@@ -56,9 +56,9 @@ jobs:
           fi
           echo "card=$CARD" >> $GITHUB_OUTPUT
 
-          VERSION=$(grep -E '^ref_name:' "$CARD" | awk '{print $2}' | sed 's/#.*//' | tr -d ' "' | tr -d "'" | tr -d '\r'')
+          VERSION=$(grep -E '^ref_name:' "$CARD" | awk '{print $2}' | sed -e 's/#.*//' -e 's/[^a-zA-Z0-9._-]//g')
           if [ -z "$VERSION" ]; then
-            VERSION=$(grep -E '^ref:' "$CARD" | awk '{print $2}' | tr -d ' "' | tr -d "'" | tr -d '\r' | cut -c1-8)
+            VERSION=$(grep -E '^ref:' "$CARD" | awk '{print $2}' | sed 's/[^a-zA-Z0-9._-]//g' | cut -c1-8)
           fi
           [ -z "$VERSION" ] && VERSION="snapshot"
 
