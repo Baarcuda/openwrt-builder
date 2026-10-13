@@ -95,3 +95,32 @@ rm -f /etc/rc.d/*luci_statistics* /etc/rc.d/*collectd* 2>/dev/null || true
 sysctl -p /etc/sysctl.d/99-optimization.conf 2>/dev/null || true
 
 exit 0
+
+# 13. Оптимизация ядра и Go Runtime под объем памяти
+if [ "$HN" = "ax6s" ]; then
+    sysctl -w vm.min_free_kbytes=8192 2>/dev/null || true
+    GO_MEM="40MiB"
+else
+    sysctl -w vm.min_free_kbytes=16384 2>/dev/null || true
+    GO_MEM="64MiB"
+fi
+
+# Окружение для NetBird
+mkdir -p /etc
+grep -qxF "GOMEMLIMIT=" /etc/netbird.env 2>/dev/null || echo "GOMEMLIMIT=${GO_MEM}" >> /etc/netbird.env
+grep -qxF "GOGC=50" /etc/netbird.env 2>/dev/null || echo "GOGC=50" >> /etc/netbird.env
+grep -qxF "GODEBUG=madvdontneed=1" /etc/netbird.env 2>/dev/null || echo "GODEBUG=madvdontneed=1" >> /etc/netbird.env
+
+# Глобальный профиль для CLI и процессов Go
+mkdir -p /etc/profile.d
+cat << GOENV > /etc/profile.d/golang.sh
+export GOMEMLIMIT=${GO_MEM}
+export GOGC=50
+export GODEBUG=madvdontneed=1
+GOENV
+chmod +x /etc/profile.d/golang.sh
+
+# Инъекция параметров в сервис SSClash (если установлен)
+if [ -f /etc/init.d/ssclash ]; then
+    sed -i "/procd_open_instance/a \        procd_set_param env GOMEMLIMIT=${GO_MEM} GOGC=50 GODEBUG=madvdontneed=1" /etc/init.d/ssclash 2>/dev/null || true
+fi
