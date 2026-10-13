@@ -66,4 +66,8 @@ sed -i '/\/awg\//d; /\/zapret\//d; /\/zapret2\//d; /\/netbird_luci\//d' /etc/apk
 # 10. Точки монтирования fstab
 [ -f /etc/config/fstab ] || block detect > /etc/config/fstab 2>/dev/null || true
 
+# Полная блокировка запуска collectd
+chmod -x /usr/sbin/collectd 2>/dev/null || true
+rm -f /etc/rc.d/*luci_statistics* /etc/rc.d/*collectd* 2>/dev/null || true
+
 exit 0
