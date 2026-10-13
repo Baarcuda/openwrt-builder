@@ -29,6 +29,8 @@ SUBTARGET=$(get_field "$CARD" subtarget)
 PROFILE=$(get_field "$CARD" profile)
 REF=$(get_field "$CARD" ref)
 
+[ -n "$REF" ] || REF="58efa9917d4cc53fceed173529a286187649e827"
+
 echo "=========================================================="
 echo " Сборка: $DEVICE ($TARGET/$SUBTARGET - $PROFILE)"
 echo " коммит: $REF"
@@ -44,15 +46,13 @@ else
 fi
 git -C "$TREE" checkout -f --detach "$REF"
 
-# Активация бэкендов LZ4 и ZSTD в ядре Linux 6.12 для ZRAM (целевой таргет + generic)
+# Активация бэкендов LZ4 и ZSTD в ядре Linux 6.12 для ZRAM
 for kcfg in "$TREE/target/linux/$TARGET/config-6.12" "$TREE/target/linux/generic/config-6.12"; do
   if [ -f "$kcfg" ]; then
-    grep -q "CONFIG_ZRAM_BACKEND_LZ4=y" "$kcfg" || cat << "KCONF" >> "$kcfg"
-CONFIG_ZRAM_BACKEND_LZ4=y
-CONFIG_ZRAM_BACKEND_ZSTD=y
-CONFIG_LZ4_COMPRESS=y
-CONFIG_LZ4_DECOMPRESS=y
-KCONF
+    for opt in CONFIG_ZRAM_BACKEND_LZ4 CONFIG_ZRAM_BACKEND_ZSTD CONFIG_LZ4_COMPRESS CONFIG_LZ4_DECOMPRESS; do
+      sed -i "/# ${opt} is not set/d" "$kcfg"
+      grep -q "^${opt}=y" "$kcfg" || echo "${opt}=y" >> "$kcfg"
+    done
   fi
 done
 
@@ -63,7 +63,7 @@ if [ -f "$BUILDER_DIR/custom_feeds.conf" ]; then
     case "$line" in
       src-git*)
         FEED_NAME=$(echo "$line" | awk '{print $2}')
-        if ! grep -q " $FEED_NAME " "$TREE/feeds.conf.default"; then
+        if ! grep -q "^src-[^ ]\+[[:space:]]\+${FEED_NAME}\([[:space:]]\|$\)" "$TREE/feeds.conf.default"; then
           echo "$line" >> "$TREE/feeds.conf.default"
         fi
         ;;
@@ -72,7 +72,7 @@ if [ -f "$BUILDER_DIR/custom_feeds.conf" ]; then
 fi
 
 echo "[2/5] обновление и установка feeds..."
-( cd "$TREE" && ./scripts/feeds update -a && ./scripts/feeds install -a )
+( cd "$TREE" && ./scripts/feeds update -a && ./scripts/feeds install -a && ./scripts/feeds uninstall luci-app-weechat 2>/dev/null || true )
 
 # 3. Формирование .config
 echo "[3/5] генерация .config..."
@@ -88,44 +88,59 @@ fi
 
 ( cd "$TREE" && make defconfig )
 
-# 4. Подготовка файлов образа
+# 4. Подготовка файлов образа (чистый оверлей)
 echo "[4/5] подготовка файлов образа..."
+rm -rf "$TREE/files"
 mkdir -p "$TREE/files/opt/clash/bin" "$TREE/files/etc/init.d" "$TREE/files/usr/bin"
 
 if [ -d "$BUILDER_DIR/files" ]; then
-  cp -r "$BUILDER_DIR/files/"* "$TREE/files/"
+  cp -a "$BUILDER_DIR/files/." "$TREE/files/"
 fi
 
 # Скачивание SSClash-Go
 echo "      загрузка SSClash-Go..."
-curl -sL https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-linux-arm64 -o "$TREE/files/opt/clash/bin/ssclash"
-chmod +x "$TREE/files/opt/clash/bin/ssclash"
-curl -sL https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-openwrt-service.tar.gz | tar -xz -C "$TREE/files/"
-chmod +x "$TREE/files/etc/init.d/ssclash"
+if curl -sLf https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-linux-arm64 -o "$TREE/files/opt/clash/bin/ssclash"; then
+  chmod 0755 "$TREE/files/opt/clash/bin/ssclash"
+else
+  echo "::warning::Не удалось загрузить бинарник SSClash-Go"
+fi
+
+TMP_SERVICE=$(mktemp -d)
+if curl -sLf https://github.com/zerolabnet/SSClash-Go/releases/latest/download/ssclash-openwrt-service.tar.gz -o "$TMP_SERVICE/service.tar.gz"; then
+  tar -xzf "$TMP_SERVICE/service.tar.gz" -C "$TREE/files/"
+fi
+rm -rf "$TMP_SERVICE"
 
 # Загрузка и распаковка FPTN (ARM64 + LuCI)
 echo "      загрузка FPTN (ARM64 + LuCI)..."
-FPTN_TAG=$(curl -sIL -o /dev/null -w "%{url_effective}" https://github.com/fptn-project/fptn/releases/latest | tr -d "\r" | awk -F"/" "{print \$NF}")
-[ -z "$FPTN_TAG" ] && FPTN_TAG="0.4.6"
+FPTN_TAG=$(curl -sIL -o /dev/null -w "%{url_effective}" https://github.com/fptn-project/fptn/releases/latest | tr -d "\r" | awk -F/ '{print $NF}')
+[ -n "$FPTN_TAG" ] || FPTN_TAG="0.4.6"
 
 FPTN_IPK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-24.10.x-aarch64_cortex-a53.ipk"
 TMP_DIR=$(mktemp -d)
-if curl -sL "$FPTN_IPK" -o "$TMP_DIR/fptn.ipk"; then
-    ( cd "$TMP_DIR" && ar -x fptn.ipk 2>/dev/null || tar -xzf fptn.ipk 2>/dev/null || true )
-    if [ -f "$TMP_DIR/data.tar.gz" ]; then
-        tar -xzf "$TMP_DIR/data.tar.gz" -C "$TREE/files/"
-        echo "      FPTN успешно распакован в files/"
-    elif [ -f "$TMP_DIR/data.tar" ]; then
-        tar -xf "$TMP_DIR/data.tar" -C "$TREE/files/"
-        echo "      FPTN успешно распакован в files/"
-    fi
+if curl -sLf "$FPTN_IPK" -o "$TMP_DIR/fptn.ipk"; then
+  ( cd "$TMP_DIR" && ( ar -x fptn.ipk 2>/dev/null || tar -xzf fptn.ipk 2>/dev/null || true ) )
+  if [ -f "$TMP_DIR/data.tar.gz" ]; then
+    tar -xzf "$TMP_DIR/data.tar.gz" -C "$TREE/files/"
+    echo "      FPTN успешно распакован в files/"
+  elif [ -f "$TMP_DIR/data.tar" ]; then
+    tar -xf "$TMP_DIR/data.tar" -C "$TREE/files/"
+    echo "      FPTN успешно распакован в files/"
+  fi
+else
+  echo "::warning::Не удалось загрузить пакет FPTN"
 fi
 rm -rf "$TMP_DIR"
+
+# Гарантированная нормализация прав доступа оверлея
+[ -d "$TREE/files/etc/init.d" ] && chmod 0755 "$TREE/files/etc/init.d"/* 2>/dev/null || true
+[ -d "$TREE/files/etc/uci-defaults" ] && chmod 0755 "$TREE/files/etc/uci-defaults"/* 2>/dev/null || true
+[ -d "$TREE/files/usr/bin" ] && chmod 0755 "$TREE/files/usr/bin"/* 2>/dev/null || true
 
 sh scripts/preflight.sh "$CARD" "$TREE"
 
 # 5. Сборка
-if [ "$DO_BUILD TARGET" ] && [ "$DO_BUILD" -eq 1 ]; then
+if [ "$DO_BUILD" -eq 1 ]; then
   echo "[5/5] компиляция..."
   if [ -n "$JOBS" ]; then
     ( cd "$TREE" && make -j"$JOBS" ) || {

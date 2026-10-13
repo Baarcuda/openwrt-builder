@@ -9,7 +9,7 @@
 set -eu
 
 SOFT=0
-TREE=""
+TREE="openwrt"
 while [ $# -gt 0 ]; do
   case "$1" in
     --soft) SOFT=1 ;;
@@ -32,23 +32,26 @@ done
 
 get_field() {
   sed -n "s/^${2}:[[:space:]]*//p" "$1" | head -n 1 \
-    | sed 's/[[:space:]]*#.*//' | sed 's/[[:space:]]*$//'
+    | sed 's/[[:space:]]*#.*//' | sed 's/[[:space:]]*$//' \
+    | sed 's/^["'"'"']//; s/["'"'"']$//'
 }
 
-config_host_target() {
-  [ -f .config ] || return 0
-  grep -E '^CONFIG_TARGET_[A-Za-z0-9]+=y$' .config 2>/dev/null \
-    | head -n 1 | sed 's/^CONFIG_TARGET_//; s/=y$//' || true
+config_host_device() {
+  cfg=".config"
+  [ -n "$TREE" ] && [ -f "$TREE/.config" ] && cfg="$TREE/.config"
+  [ -f "$cfg" ] || return 0
+  grep -E '^CONFIG_TARGET_[A-Za-z0-9_]+_DEVICE_[A-Za-z0-9_-]+=y$' "$cfg" 2>/dev/null \
+    | head -n 1 | sed 's/^CONFIG_TARGET_.*_DEVICE_//; s/=y$//' || true
 }
 
-HOST_TARGET=$(config_host_target)
+HOST_DEVICE=$(config_host_device)
 MODE=$([ "$SOFT" -eq 1 ] && echo "мягкий" || echo "строгий")
 
 echo "=========================================================="
 echo " preflight-all   режим: $MODE"
-[ -n "$HOST_TARGET" ] \
-  && echo " .config собран под target: $HOST_TARGET" \
-  || echo " .config: не найден или без CONFIG_TARGET_<...>=y"
+[ -n "$HOST_DEVICE" ] \
+  && echo " .config собран под профиль: $HOST_DEVICE" \
+  || echo " .config: не найден или не выбран конкретный профиль"
 echo "=========================================================="
 
 TOTAL=0 OKN=0 FAILN=0 SKIPN=0
@@ -57,15 +60,15 @@ SUMMARY=""
 for card in $CARDS; do
   TOTAL=$((TOTAL + 1))
   cdev=$(get_field "$card" device)
-  ctarget=$(get_field "$card" target)
+  cprofile=$(get_field "$card" profile)
 
-  if [ "$SOFT" -eq 1 ] && [ -n "$HOST_TARGET" ] && [ -n "$ctarget" ] \
-     && [ "$ctarget" != "$HOST_TARGET" ]; then
+  if [ "$SOFT" -eq 1 ] && [ -n "$HOST_DEVICE" ] && [ -n "$cprofile" ] \
+     && [ "$cprofile" != "$HOST_DEVICE" ]; then
     SKIPN=$((SKIPN + 1))
     SUMMARY="$SUMMARY
-  SKIP  $cdev ($card) — .config под '$HOST_TARGET', карточка про '$ctarget'"
+  SKIP  $cdev ($card) — .config под '$HOST_DEVICE', карточка '$cprofile'"
     echo
-    echo ">> $card : SKIP (target '$ctarget' != .config '$HOST_TARGET')"
+    echo ">> $card : SKIP (профиль '$cprofile' != .config '$HOST_DEVICE')"
     continue
   fi
 
