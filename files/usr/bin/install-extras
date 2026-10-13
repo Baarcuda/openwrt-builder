@@ -23,27 +23,31 @@ install_mosdns() {
 }
 
 install_fptn() {
-    log "Установка FPTN клиента (ARM64 + LuCI)..."
+    log "Установка FPTN клиента (OpenWrt 25.12 APK)..."
     TMP_DIR=$(mktemp -d)
     
     FPTN_TAG=$(curl -sIL -o /dev/null -w "%{url_effective}" https://github.com/fptn-project/fptn/releases/latest | tr -d "\r\n" | awk -F/ '{print $NF}')
     [ -n "$FPTN_TAG" ] || FPTN_TAG="0.4.6"
 
-    FPTN_IPK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-24.10.x-aarch64_cortex-a53.ipk"
-    log "Загрузка FPTN ${FPTN_TAG}..."
-    if ! curl -sLf --connect-timeout 10 -m 300 "$FPTN_IPK" -o "$TMP_DIR/fptn.ipk"; then
-        rm -rf "$TMP_DIR"
-        err "Не удалось загрузить пакет FPTN с GitHub"
-    fi
-
-    ( cd "$TMP_DIR" && ( ar -x fptn.ipk 2>/dev/null || tar -xzf fptn.ipk 2>/dev/null || true ) )
-    if [ -f "$TMP_DIR/data.tar.gz" ]; then
-        tar -xzf "$TMP_DIR/data.tar.gz" -C /
-    elif [ -f "$TMP_DIR/data.tar" ]; then
-        tar -xf "$TMP_DIR/data.tar" -C /
+    FPTN_APK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-25.12.x-aarch64_cortex-a53.apk"
+    log "Загрузка FPTN ${FPTN_TAG} (.apk для 25.12)..."
+    
+    if curl -sLf --connect-timeout 10 -m 300 "$FPTN_APK" -o "$TMP_DIR/fptn.apk"; then
+        log "Установка через нативный apk..."
+        apk add --allow-untrusted "$TMP_DIR/fptn.apk"
     else
-        rm -rf "$TMP_DIR"
-        err "Не удалось распаковать данные из fptn.ipk"
+        log "Fallback: загрузка IPK для 24.10..."
+        FPTN_IPK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-24.10.x-aarch64_cortex-a53.ipk"
+        if ! curl -sLf --connect-timeout 10 -m 300 "$FPTN_IPK" -o "$TMP_DIR/fptn.ipk"; then
+            rm -rf "$TMP_DIR"
+            err "Не удалось загрузить пакет FPTN с GitHub"
+        fi
+        ( cd "$TMP_DIR" && ( ar -x fptn.ipk 2>/dev/null || tar -xzf fptn.ipk 2>/dev/null || true ) )
+        if [ -f "$TMP_DIR/data.tar.gz" ]; then
+            tar -xzf "$TMP_DIR/data.tar.gz" -C /
+        elif [ -f "$TMP_DIR/data.tar" ]; then
+            tar -xf "$TMP_DIR/data.tar" -C /
+        fi
     fi
     rm -rf "$TMP_DIR"
 
@@ -51,7 +55,7 @@ install_fptn() {
     chmod 0755 /usr/bin/fptn-tcp-probe 2>/dev/null || true
     [ -f /etc/init.d/fptn ] && chmod 0755 /etc/init.d/fptn && /etc/init.d/fptn enable 2>/dev/null || true
 
-    log "FPTN успешно установлен в /overlay."
+    log "FPTN успешно установлен. Доступен в LuCI: 'Службы' -> 'FPTN'."
 }
 
 install_lalune() {
