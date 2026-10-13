@@ -109,6 +109,21 @@ install_ssclash() {
     fi
 }
 
+install_netbird() {
+    log "Установка NetBird Mesh VPN + LuCI (okk.sh)..."
+    INSTALL_URL="https://luci-app-netbird.okk.sh/install.sh"
+    TMP_SH=$(mktemp)
+    
+    if curl -sLf --connect-timeout 10 -m 180 "$INSTALL_URL" -o "$TMP_SH"; then
+        sh "$TMP_SH" "$@"
+        rm -f "$TMP_SH"
+        log "NetBird успешно установлен. Доступен в LuCI: 'Службы' -> 'NetBird'."
+    else
+        rm -f "$TMP_SH"
+        err "Не удалось загрузить скрипт установки NetBird с $INSTALL_URL"
+    fi
+}
+
 case "${1:-}" in
     mosdns)
         shift
@@ -126,14 +141,19 @@ case "${1:-}" in
         shift
         install_ssclash "$@"
         ;;
+    netbird)
+        shift
+        install_netbird "$@"
+        ;;
     all)
         install_mosdns
         install_fptn
         install_lalune
         install_ssclash
+        install_netbird
         ;;
     *)
-        echo "Использование: install-extras <mosdns|fptn|lalune|ssclash|all> [параметры]"
+        echo "Использование: install-extras <mosdns|fptn|lalune|ssclash|netbird|all> [параметры]"
         exit 1
         ;;
 esac
