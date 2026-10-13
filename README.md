@@ -47,12 +47,10 @@
 
 Тяжеловесные бинарные клиенты Go/Rust суммарным объёмом >100 МБ вынесены из SquashFS для предотвращения переполнения Flash-памяти. Разворачиваются в постоянный раздел роутера командой `/usr/bin/install-extras`:
 
-```bash
+
 install-extras mosdns    # [MosDNS v5](https://github.com/sbwml/luci-app-mosdns)
 install-extras fptn      # [FPTN](https://github.com/fptn-project/fptn) клиент
 install-extras lalune    # [LaLune](https://github.com/Endlad2/LaLune) клиент
 install-extras ssclash   # [SSClash-Go](https://github.com/zerolabnet/SSClash-Go) (Mihomo core + UI)
 install-extras netbird   # [NetBird](https://github.com/netbirdio/netbird),[luci-app-netbird](https://github.com/looong-cat/luci-app-netbird) Mesh VPN
 install-extras all # Установить все сервисы
-```
-
