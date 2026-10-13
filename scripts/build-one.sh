@@ -111,27 +111,6 @@ if curl -sLf https://github.com/zerolabnet/SSClash-Go/releases/latest/download/s
 fi
 rm -rf "$TMP_SERVICE"
 
-# Загрузка и распаковка FPTN (ARM64 + LuCI)
-echo "      загрузка FPTN (ARM64 + LuCI)..."
-FPTN_TAG=$(curl -sIL -o /dev/null -w "%{url_effective}" https://github.com/fptn-project/fptn/releases/latest | tr -d "\r" | awk -F/ '{print $NF}')
-[ -n "$FPTN_TAG" ] || FPTN_TAG="0.4.6"
-
-FPTN_IPK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-24.10.x-aarch64_cortex-a53.ipk"
-TMP_DIR=$(mktemp -d)
-if curl -sLf "$FPTN_IPK" -o "$TMP_DIR/fptn.ipk"; then
-  ( cd "$TMP_DIR" && ( ar -x fptn.ipk 2>/dev/null || tar -xzf fptn.ipk 2>/dev/null || true ) )
-  if [ -f "$TMP_DIR/data.tar.gz" ]; then
-    tar -xzf "$TMP_DIR/data.tar.gz" -C "$TREE/files/"
-    echo "      FPTN успешно распакован в files/"
-  elif [ -f "$TMP_DIR/data.tar" ]; then
-    tar -xf "$TMP_DIR/data.tar" -C "$TREE/files/"
-    echo "      FPTN успешно распакован в files/"
-  fi
-else
-  echo "::warning::Не удалось загрузить пакет FPTN"
-fi
-rm -rf "$TMP_DIR"
-
 # Гарантированная нормализация прав доступа оверлея
 [ -d "$TREE/files/etc/init.d" ] && chmod 0755 "$TREE/files/etc/init.d"/* 2>/dev/null || true
 [ -d "$TREE/files/etc/uci-defaults" ] && chmod 0755 "$TREE/files/etc/uci-defaults"/* 2>/dev/null || true

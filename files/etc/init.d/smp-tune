@@ -35,7 +35,7 @@ start() {
     done
 
     # 3. Привязка процессов (Affinity) к выделенным ядрам
-    for proc in ssclash fptn nfqws netbird mosdns; do
+    for proc in ssclash fptn nfqws netbird mosdns csqtt lalune; do
         for pid in $(pidof "$proc" 2>/dev/null); do
             taskset -p "$APP_MASK" "$pid" 2>/dev/null || true
         done

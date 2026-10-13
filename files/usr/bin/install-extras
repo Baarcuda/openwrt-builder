@@ -12,7 +12,7 @@ install_mosdns() {
     TAR_URL="https://github.com/sbwml/luci-app-mosdns/releases/latest/download/${ARCH}-openwrt-25.12.tar.gz"
     
     log "Загрузка архива пакетов..."
-    if ! curl -sL --connect-timeout 10 -m 300 "$TAR_URL" -o "$TMP_DIR/mosdns.tar.gz"; then
+    if ! curl -sLf --connect-timeout 10 -m 300 "$TAR_URL" -o "$TMP_DIR/mosdns.tar.gz"; then
         rm -rf "$TMP_DIR"
         err "Не удалось скачать архив MosDNS с GitHub"
     fi
@@ -32,30 +32,96 @@ install_mosdns() {
     log "MosDNS успешно установлен. Доступен в LuCI: 'Службы' -> 'MosDNS'."
 }
 
-install_lalune() {
-    log "Установка LaLune ARM64..."
-    LL_URL="https://github.com/lalune-project/lalune/releases/latest/download/lalune-linux-arm64"
-    if curl -sL --connect-timeout 10 -m 180 "$LL_URL" -o /usr/bin/lalune; then
-        chmod +x /usr/bin/lalune
-        log "LaLune установлен в /usr/bin/lalune."
-    else
-        err "Не удалось загрузить бинарник LaLune"
+install_fptn() {
+    log "Установка FPTN клиента (ARM64 + LuCI)..."
+    TMP_DIR=$(mktemp -d)
+    
+    FPTN_TAG=$(curl -sIL -o /dev/null -w "%{url_effective}" https://github.com/fptn-project/fptn/releases/latest | tr -d "\r\n" | awk -F/ '{print $NF}')
+    [ -n "$FPTN_TAG" ] || FPTN_TAG="0.4.6"
+
+    FPTN_IPK="https://github.com/fptn-project/fptn/releases/download/${FPTN_TAG}/fptn-client-${FPTN_TAG}-openwrt-24.10.x-aarch64_cortex-a53.ipk"
+    log "Загрузка FPTN ${FPTN_TAG}..."
+    if ! curl -sLf --connect-timeout 10 -m 300 "$FPTN_IPK" -o "$TMP_DIR/fptn.ipk"; then
+        rm -rf "$TMP_DIR"
+        err "Не удалось загрузить пакет FPTN с GitHub"
     fi
+
+    ( cd "$TMP_DIR" && ( ar -x fptn.ipk 2>/dev/null || tar -xzf fptn.ipk 2>/dev/null || true ) )
+    if [ -f "$TMP_DIR/data.tar.gz" ]; then
+        tar -xzf "$TMP_DIR/data.tar.gz" -C /
+    elif [ -f "$TMP_DIR/data.tar" ]; then
+        tar -xf "$TMP_DIR/data.tar" -C /
+    else
+        rm -rf "$TMP_DIR"
+        err "Не удалось распаковать данные из fptn.ipk"
+    fi
+    rm -rf "$TMP_DIR"
+
+    chmod 0755 /usr/bin/fptn-client-cli 2>/dev/null || true
+    chmod 0755 /usr/bin/fptn-tcp-probe 2>/dev/null || true
+    [ -f /etc/init.d/fptn ] && chmod 0755 /etc/init.d/fptn && /etc/init.d/fptn enable 2>/dev/null || true
+
+    log "FPTN успешно установлен в /overlay."
+}
+
+install_lalune() {
+    log "Установка LaLune (csqtt-client + backend на :1062)..."
+    INSTALL_URL="https://raw.githubusercontent.com/Endlad2/LaLune/main/Installer/openwrt.sh"
+    TMP_SH=$(mktemp)
+    
+    if curl -sLf --connect-timeout 10 -m 60 "$INSTALL_URL" -o "$TMP_SH"; then
+        sh "$TMP_SH"
+        rm -f "$TMP_SH"
+    else
+        rm -f "$TMP_SH"
+        err "Не удалось загрузить скрипт установки LaLune с GitHub"
+    fi
+
+    # Генерация procd-службы для гарантированного автозапуска после перезагрузки
+    log "Регистрация службы автозагрузки /etc/init.d/lalune..."
+    cat << 'EOF' > /etc/init.d/lalune
+#!/bin/sh /etc/rc.common
+
+USE_PROCD=1
+START=95
+STOP=10
+
+PROG="/root/.la-lune/lalune-openwrt-backend"
+
+start_service() {
+    [ -x "$PROG" ] || return 1
+    procd_open_instance
+    procd_set_param command "$PROG"
+    procd_set_param respawn 3600 5 0
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_close_instance
+}
+EOF
+    chmod 0755 /etc/init.d/lalune
+    /etc/init.d/lalune enable 2>/dev/null || true
+
+    log "LaLune успешно установлен в ~/.la-lune/ и зарегистрирован в автозагрузке (порт :1062)."
+    log "Подключение в UI: 'Настройки' -> 'Экспериментальное' -> 'Роутеры' -> 'Подключить OpenWRT'."
 }
 
 case "${1:-}" in
     mosdns)
         install_mosdns
         ;;
+    fptn)
+        install_fptn
+        ;;
     lalune)
         install_lalune
         ;;
     all)
         install_mosdns
+        install_fptn
         install_lalune
         ;;
     *)
-        echo "Использование: install-extras <mosdns|lalune|all>"
+        echo "Использование: install-extras <mosdns|fptn|lalune|all>"
         exit 1
         ;;
 esac
