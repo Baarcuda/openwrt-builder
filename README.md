@@ -1,43 +1,45 @@
 # OpenWrt Builder
 
-Сборщик прошивок OpenWrt для устройств:
+Модульный сборщик оптимизированных прошивок OpenWrt для устройств:
 * **Xiaomi AX3600** (`qualcommax / ipq807x`)
 * **Xiaomi Router AX6000 RA72** (`qualcommax / ipq50xx`)
 * **Xiaomi AX6S** (`mediatek / mt7622`)
 
+**База:** OpenWrt 25.12 (Linux 6.12, пакетный менеджер `apk-tools v3`).
+
 ---
 
 ### Параметры по умолчанию
-* **IP-адрес:** `192.168.10.1`
-* **Wi-Fi:** включён (пароль: `12345678`)
-* **Тема оформления:** `OpenWrt 2020`
-* **Оптимизация:** BBR, Packet Steering (все ядра), Flow Offloading, кэш DNS 2048
+* **IP-адрес LAN:** `192.168.10.1` (маска `255.255.255.0`)
+* **DHCP:** подсеть `.100` – `.250`, аренда 12ч, расширенный DNS-кэш (2048 записей, 1000 параллельных запросов)
+* **Wi-Fi:** включён (SSID по имени устройства: `ax3600`, `ax6000` или `ax6s`; пароль: `12345678`, WPA2-PSK, регион RU, WMM включён)
+* **ZRAM:** сжатие LZ4 (256 МБ свопа) с нативным бэкендом ядра Linux 6.12
+* **Многопоточность и разгон сети:** Packet Steering (все ядра CPU), Flow Offloading (включая HW NAT), Google TCP BBR, сетевые буферы 16 МБ
+* **Интерфейс:** Тема `OpenWrt 2020`, полная русская локализация
 
 ---
 
-### Вшитые сервисы (из коробки)
-* **SSClash-Go** (веб-панель `:9091`, *по умолчанию выключен*)
+### Вшитые сервисы и обход DPI
+* **SSClash-Go** (автономная панель на порту `:9091`, *по умолчанию выключен*)
+* **Zapret 1** и **Zapret 2** (`luci-app-zapret`, `luci-app-zapret2`, с утилитой `bind-dig`, *по умолчанию выключены*)
 * **FPTN** (веб-интерфейс в LuCI: *VPN → FPTN*, *по умолчанию выключен*)
-* **Zapret 1** и **Zapret 2** (`luci-app-zapret`, `luci-app-zapret2`, *по умолчанию выключены*)
-* **Watchcat** (*по умолчанию выключен*)
-* **Динамический DNS** (*по умолчанию выключен*)
-* **OpenVPN** (`luci-app-openvpn`, `openvpn-openssl`)
-* **WireGuard** (`luci-app-wireguard`, `kmod-wireguard`)
+* **NetBird Web UI** (веб-интерфейс в LuCI: *Services → NetBird*)
+* **WireGuard** (`luci-app-wireguard`, `luci-proto-wireguard`, `kmod-wireguard`)
 * **AmneziaWG** (`luci-proto-amneziawg`, `kmod-amneziawg`, `amneziawg-tools`)
-* **L2TP-Static** (`xl2tpd`, `ppp-mod-pppol2tp`)
-* **6in4** (`6in4`, `luci-proto-ipv6`)
-* **Терминал** (`luci-app-ttyd`)
-* **uHTTPd** (`uhttpd`, `uhttpd-mod-ubus`)
-* **UPnP IGD и PCP** (`luci-app-upnp`, `miniupnpd`)
-* **Тема LuCI:** `luci-theme-openwrt-2020`
-* **Русская локализация:** `luci-i18n-*-ru`
-* **Утилиты:** `curl`, `htop`, `nano`
+* **OpenVPN** (`luci-app-openvpn`, `openvpn-openssl`)
 
 ---
 
-### Дополнительные сервисы по запросу
-Для экономии Flash-памяти клиенты NetBird и LaLune устанавливаются в постоянную память `/overlay` одной командой через терминал роутера:
-```bash
-install-extras netbird  # Установить NetBird
-install-extras lalune   # Установить LaLune
-install-extras all      # Установить оба
+### Сетевые протоколы и маршрутизация
+* **Туннелирование IPv6:** 6in4 (RFC4213), 6rd, 6to4
+* **Туннелирование L2/L3:** GRE, GRETAP, PPtP, L2TP-Static (`xl2tpd`, `ppp-mod-pppol2tp`)
+* **Mesh и мосты:** Batman-adv (`kmod-batman-adv`, `batctl-default`), Relay Bridge (`relayd`)
+* **Модемы:** 3G / 4G / LTE (`luci-proto-3g`, `comgt`)
+
+---
+
+### Системное управление и мониторинг
+* **Трафик:** SQM QoS (`luci-app-sqm`, `kmod-sched-cake`), мониторинг клиентов (`luci-app-nlbwmon`)
+* **Безопасность:** Access Control (`luci-app-access-control`), блокировка рекламы (`luci-app-adblock-fast`)
+* **Хранилище:** Точки монтирования fstab (`block-mount`, `kmod-fs-ext4/vfat/ntfs3`, `kmod-usb-storage`)
+* **Управление:** Файловый менеджер (`luci-app-filemanager`), терминал (`ttyd`), пользовательские команды (`luci-app-commands`), Watchcat, DDNS
