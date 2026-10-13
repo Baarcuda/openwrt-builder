@@ -91,4 +91,7 @@ uci commit wireless 2>/dev/null || true
 chmod -x /usr/sbin/collectd 2>/dev/null || true
 rm -f /etc/rc.d/*luci_statistics* /etc/rc.d/*collectd* 2>/dev/null || true
 
+# Немедленное применение sysctl сетевых буферов до старта демонов
+sysctl -p /etc/sysctl.d/99-optimization.conf 2>/dev/null || true
+
 exit 0
