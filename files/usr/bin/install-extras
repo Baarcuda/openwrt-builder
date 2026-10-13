@@ -106,6 +106,13 @@ install_ssclash() {
     if curl -sLf --connect-timeout 10 -m 60 "$INSTALL_URL" -o "$TMP_SH"; then
         ash "$TMP_SH" "$@"
         rm -f "$TMP_SH"
+        
+        # Патч init-скрипта для гарантированной работы TLS через CLI-аргументы
+        if [ -f /etc/init.d/ssclash ]; then
+            sed -i 's|procd_set_param command "$PROG" serve|if [ -f "$TLS_CERT" ] \&\& [ -f "$TLS_KEY" ]; then procd_set_param command "$PROG" serve --tls-cert "$TLS_CERT" --tls-key "$TLS_KEY"; else procd_set_param command "$PROG" serve; fi|' /etc/init.d/ssclash 2>/dev/null || true
+            /etc/init.d/ssclash restart 2>/dev/null || true
+        fi
+        
         log "SSClash-Go успешно установлен. Панель управления доступна на порту :9091."
     else
         rm -f "$TMP_SH"
