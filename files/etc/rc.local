@@ -13,11 +13,11 @@ if [ ! -f /etc/wifi_configured_done ]; then
         *)         SSID_NAME="OpenWrt" ;;
     esac
 
-    # Включаем radio0 и radio1
+    # Включаем основные диапазоны radio0 (2.4G) и radio1 (5G)
     uci set wireless.radio0.disabled='0' 2>/dev/null || true
     uci set wireless.radio1.disabled='0' 2>/dev/null || true
 
-    # Для AX3600: отключаем AIoT антенну (radio2)
+    # Для AX3600: отключаем AIoT в конфигурации wireless
     if echo "$BOARD_NAME" | grep -q "ax3600"; then
         uci set wireless.radio2.disabled='1' 2>/dev/null || true
         for iface in $(uci -q show wireless | grep "device='radio2'" | cut -d. -f2); do
@@ -38,11 +38,16 @@ if [ ! -f /etc/wifi_configured_done ]; then
 
     uci commit wireless
     wifi reload 2>/dev/null || true
-    [ "$SSID_NAME" = "ax3600" ] && wifi down radio2 2>/dev/null || true
     touch /etc/wifi_configured_done
 fi
 
-# 2. Отключение светодиода AIoT (если присутствует в sysfs)
+# 2. Аппаратное обесточивание AIoT PCIe (0000:01:00.0) и светодиода (при КАЖДОЙ загрузке)
+if [ -d "/sys/bus/pci/devices/0000:01:00.0" ]; then
+    [ -d "/sys/bus/pci/drivers/ath10k_pci" ] && echo "0000:01:00.0" > /sys/bus/pci/drivers/ath10k_pci/unbind 2>/dev/null || true
+    echo 1 > "/sys/bus/pci/devices/0000:01:00.0/remove" 2>/dev/null || true
+    rmmod ath10k_pci ath10k_core 2>/dev/null || true
+fi
+
 for d in /sys/class/leds/*aiot*; do
     [ -d "$d" ] || continue
     echo none > "$d/trigger" 2>/dev/null || true
