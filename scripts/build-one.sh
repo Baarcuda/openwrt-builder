@@ -114,7 +114,7 @@ if [ "$PROFILE" = "xiaomi_ax6000" ]; then
   AX6000_DTS="$TREE/target/linux/qualcommax/files/arch/arm64/boot/dts/qcom/ipq5018-ax6000.dts"
   if [ -f "$AX6000_DTS" ] && ! grep -q "nand-ecc-strength" "$AX6000_DTS"; then
     echo "==> [Патч] Применяю ECC 8-bit / 512 для SPI-NAND Xiaomi AX6000..."
-    sed -i "/nand-bus-width = <8>;/a \\t\\tnand-ecc-strength = <8>;\\n\\t\\tnand-ecc-step-size = <512>;" "$AX6000_DTS"
+    awk '/nand-bus-width = <8>;/ { print; print "\t\tnand-ecc-strength = <8>;"; print "\t\tnand-ecc-step-size = <512>;"; next }1' "$AX6000_DTS" > "$AX6000_DTS.tmp" && mv "$AX6000_DTS.tmp" "$AX6000_DTS"
   fi
 fi
 
