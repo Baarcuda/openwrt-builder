@@ -110,7 +110,7 @@ install_ssclash() {
         
         # Патч init-скрипта для гарантированной работы TLS через CLI-аргументы
         if [ -f /etc/init.d/ssclash ]; then
-            sed -i 's|procd_set_param command "$PROG" serve|if [ -f "$TLS_CERT" ] \&\& [ -f "$TLS_KEY" ]; then procd_set_param command "$PROG" serve --tls-cert "$TLS_CERT" --tls-key "$TLS_KEY"; else procd_set_param command "$PROG" serve; fi|' /etc/init.d/ssclash 2>/dev/null || true
+            sed -i 's|procd_set_param command taskset 2 "$PROG" serve|if [ -f "$TLS_CERT" ] \&\& [ -f "$TLS_KEY" ]; then procd_set_param command taskset 2 "$PROG" serve --tls-cert "$TLS_CERT" --tls-key "$TLS_KEY"; else procd_set_param command taskset 2 "$PROG" serve; fi|' /etc/init.d/ssclash 2>/dev/null || true
             /etc/init.d/ssclash restart 2>/dev/null || true
         fi
         
