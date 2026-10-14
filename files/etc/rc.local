@@ -48,4 +48,10 @@ for d in /sys/class/leds/*aiot*; do
     echo 0 > "$d/brightness" 2>/dev/null || true
 done
 
+# Ожидание спавна дочерних процессов в RAM и изоляция affinity (CPU 1)
+sleep 2
+if [ -x /etc/init.d/smp-tune ]; then
+    /etc/init.d/smp-tune restart >/dev/null 2>&1 || true
+fi
+
 exit 0
