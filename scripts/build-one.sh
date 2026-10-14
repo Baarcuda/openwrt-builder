@@ -109,31 +109,6 @@ fi
 echo "[2/5] обновление и установка feeds..."
 ( cd "$TREE" && ./scripts/feeds update -a && ./scripts/feeds install -a && ./scripts/feeds uninstall luci-app-weechat 2>/dev/null || true )
 
-# Патч ECC 8-bit для SPI-NAND Xiaomi AX6000 (защита от бутлупа)
-if [ "$PROFILE" = "xiaomi_ax6000" ]; then
-  AX6000_DTS="$TREE/target/linux/qualcommax/files/arch/arm64/boot/dts/qcom/ipq5018-ax6000.dts"
-  if [ -f "$AX6000_DTS" ] && ! grep -q "nand-ecc-strength" "$AX6000_DTS"; then
-    echo "==> [Патч] Применяю ECC 8-bit / 512 для SPI-NAND Xiaomi AX6000..."
-    awk '/nand-bus-width = <8>;/ { print; print "\t\tnand-ecc-strength = <8>;"; print "\t\tnand-ecc-step-size = <512>;"; next }1' "$AX6000_DTS" > "$AX6000_DTS.tmp" && mv "$AX6000_DTS.tmp" "$AX6000_DTS"
-  fi
-fi
-
-# Патч ECC 8-bit для SPI-NAND Xiaomi AX6000 (darkmax94 4PDA fix)
-if [ "$PROFILE" = "xiaomi_ax6000" ]; then
-  AX6000_DTS="$TREE/target/linux/qualcommax/files/arch/arm64/boot/dts/qcom/ipq5018-ax6000.dts"
-  if [ -f "$AX6000_DTS" ] && ! grep -q "nand-ecc-strength" "$AX6000_DTS"; then
-    echo "==> [Патч] Применяю ECC 8-bit / 512 для SPI-NAND Xiaomi AX6000..."
-    python3 -c '
-with open("", "r") as f:
-    s = f.read()
-if "nand-ecc-strength" not in s:
-    s = s.replace("nand-bus-width = <8>;", "nand-bus-width = <8>;\n\t\tnand-ecc-strength = <8>;\n\t\tnand-ecc-step-size = <512>;", 1)
-    with open("", "w") as f:
-        f.write(s)
-'
-  fi
-fi
-
 # 3. Формирование .config
 echo "[3/5] генерация .config..."
 cat << CONF > "$TREE/.config"
