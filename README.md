@@ -5,7 +5,7 @@
 * **Xiaomi Router AX6000 RA72** (`qualcommax / ipq50xx`, порт 2.5G)
 * **Xiaomi AX6S** (`mediatek / mt7622`, 256MB RAM)
 
-**Базовая система:** OpenWrt 25.12-SNAPSHOT (commit `58efa9917d4cc53fceed173529a286187649e827`, Linux 6.12).
+OpenWrt 25.12-SNAPSHOT (commit `58efa9917d4cc53fceed173529a286187649e827`, Linux 6.12).
 
 ---
 
@@ -13,10 +13,10 @@
 
 * **IP-адрес LAN:** `192.168.10.1` (маска `255.255.255.0`)
 * **Wi-Fi:** включён (SSID по имени устройства: `ax3600`, `ax6000` или `ax6s`; пароль: `12345678`, WPA2-PSK, регион RU, )
-* **ZRAM:**  LZ4 ядра Linux 6.12 (256 МБ свопа для AX3600/AX6000, 128 МБ с лимитами памяти для AX6S)
+* **ZRAM:**  LZ4  Linux 6.12 (256 МБ свопа для AX3600/AX6000, 128 МБ с лимитами памяти для AX6S)
 * **Сетевой  стек:** Packet Steering (RPS на все ядра), Flow Offloading ,  BBR
 * **Изоляция ядер (SMP Affinity):** Диспетчер `/etc/init.d/smp-tune` изолирует сетевые прерывания (Wi-Fi `ath11k`/`mt76`, Ethernet) на ядрах CPU 0–1, вытесняя сервисы шифрования на ядра приложений (CPU 2–3)
-* **Интерфейс:** Тема оформления `OpenWrt 2020`, русская локализация LuCI
+* **Интерфейс:**  `OpenWrt 2020`, Русская  LuCI
 
 ---
 
