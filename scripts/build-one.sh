@@ -5,19 +5,29 @@ CARD=""
 JOBS=""
 TREE="openwrt"
 DO_BUILD=1
+UPDATE_REF=0
 BUILDER_DIR="$(pwd)"
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --jobs) shift; JOBS="${1:-}" ;;
     --no-build) DO_BUILD=0 ;;
-    -h|--help) exit 0 ;;
+    -u|--update-ref) UPDATE_REF=1 ;;
+    -h|--help)
+      echo "Использование: sh scripts/build-one.sh <карточка.yml> [опции]"
+      echo "Опции:"
+      echo "  --jobs <N>       Количество параллельных потоков сборки"
+      echo "  --no-build       Сухой прогон (генерация .config и проверка без компиляции)"
+      echo "  -u, --update-ref Автоматически обновить карточку до последнего snapshot OpenWrt"
+      exit 0
+      ;;
     *) [ -z "$CARD" ] && CARD="$1" ;;
   esac
   shift
 done
 
 [ -n "$CARD" ] || { echo "укажите карточку: sh scripts/build-one.sh devices/<file>.yml" >&2; exit 2; }
+[ -f "$CARD" ] || { echo "ошибка: файл $CARD не найден" >&2; exit 2; }
 
 get_field() {
   sed -n "s/^${2}:[[:space:]]*//p" "$1" | head -n 1 | sed 's/[[:space:]]*#.*//' | tr -d ' '
@@ -28,6 +38,31 @@ TARGET=$(get_field "$CARD" target)
 SUBTARGET=$(get_field "$CARD" subtarget)
 PROFILE=$(get_field "$CARD" profile)
 REF=$(get_field "$CARD" ref)
+REF_NAME=$(get_field "$CARD" ref_name)
+
+# Автоматическое обновление коммита в карточке при флаге -u / --update-ref
+if [ "$UPDATE_REF" -eq 1 ]; then
+  case "$REF_NAME" in
+    *25.12*) REMOTE_BRANCH="openwrt-25.12" ;;
+    *main*|*master*) REMOTE_BRANCH="main" ;;
+    *) REMOTE_BRANCH="openwrt-25.12" ;;
+  esac
+
+  echo "==> Проверка последнего snapshot в ветке $REMOTE_BRANCH..."
+  LATEST_REF=$(git ls-remote https://git.openwrt.org/openwrt/openwrt.git "refs/heads/$REMOTE_BRANCH" | awk '{print $1}')
+  
+  if [ -n "$LATEST_REF" ]; then
+    if [ "$LATEST_REF" != "$REF" ]; then
+      echo "==> Обновляю $CARD: $REF -> $LATEST_REF"
+      sed -i -E "s/^ref:[[:space:]]*.*/ref: $LATEST_REF/" "$CARD"
+      REF="$LATEST_REF"
+    else
+      echo "==> Карточка уже содержит самый свежий snapshot: $REF"
+    fi
+  else
+    echo "::warning:: Не удалось получить коммит из сети, собираю на текущем: $REF"
+  fi
+fi
 
 [ -n "$REF" ] || REF="58efa9917d4cc53fceed173529a286187649e827"
 
