@@ -109,6 +109,15 @@ fi
 echo "[2/5] обновление и установка feeds..."
 ( cd "$TREE" && ./scripts/feeds update -a && ./scripts/feeds install -a && ./scripts/feeds uninstall luci-app-weechat 2>/dev/null || true )
 
+# Патч ECC 8-bit для SPI-NAND Xiaomi AX6000 (защита от бутлупа)
+if [ "$PROFILE" = "xiaomi_ax6000" ]; then
+  AX6000_DTS="$TREE/target/linux/qualcommax/files/arch/arm64/boot/dts/qcom/ipq5018-ax6000.dts"
+  if [ -f "$AX6000_DTS" ] && ! grep -q "nand-ecc-strength" "$AX6000_DTS"; then
+    echo "==> [Патч] Применяю ECC 8-bit / 512 для SPI-NAND Xiaomi AX6000..."
+    sed -i "/nand-bus-width = <8>;/a \\t\\tnand-ecc-strength = <8>;\\n\\t\\tnand-ecc-step-size = <512>;" "$AX6000_DTS"
+  fi
+fi
+
 # 3. Формирование .config
 echo "[3/5] генерация .config..."
 cat << CONF > "$TREE/.config"
