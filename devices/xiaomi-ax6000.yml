@@ -3,5 +3,5 @@ target: qualcommax
 subtarget: ipq50xx
 profile: xiaomi_ax6000
 arch: aarch64_cortex-a53
-ref: f5dae5ece4c405963a824cb7ea4c34d9a2a731d1
-ref_name: 25.12.5
+ref: f0a60eee2fe051741c643ea6118718aae1ef17fb
+ref_name: v25.12.5
