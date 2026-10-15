@@ -122,17 +122,23 @@ install_ssclash() {
 }
 
 install_netbird() {
-    log "Установка NetBird Mesh VPN + LuCI (okk.sh)..."
+    log "Установка NetBird..."
     INSTALL_URL="https://luci-app-netbird.okk.sh/install.sh"
     TMP_SH=$(mktemp)
-    
     if curl -sLf --connect-timeout 10 -m 180 "$INSTALL_URL" -o "$TMP_SH"; then
         sh "$TMP_SH" "$@"
         rm -f "$TMP_SH"
-        log "NetBird успешно установлен. Доступен в LuCI: 'Службы' -> 'NetBird'."
+        if [ -f /etc/init.d/netbird ]; then
+            sed -i 's|procd_set_param command /usr/bin/netbird|procd_set_param command taskset 2 /usr/bin/netbird|g' /etc/init.d/netbird 2>/dev/null || true
+            if ! grep -q "GOMEMLIMIT" /etc/init.d/netbird; then
+                sed -i '/NB_DNS_STATE_FILE/a \        procd_append_param env GOGC="75"' /etc/init.d/netbird 2>/dev/null || true
+                sed -i '/NB_DNS_STATE_FILE/a \        procd_append_param env GOMEMLIMIT="45MiB"' /etc/init.d/netbird 2>/dev/null || true
+            fi
+            /etc/init.d/netbird restart 2>/dev/null || true
+        fi
     else
         rm -f "$TMP_SH"
-        err "Не удалось загрузить скрипт установки NetBird с $INSTALL_URL"
+        err "Не удалось загрузить NetBird"
     fi
 }
 
