@@ -51,7 +51,7 @@ start() {
 
     # 4. Привязка процессов (Affinity) к выделенным ядрам приложений
     # Включает: Mihomo/SSClash, FPTN, Zapret/Zapret2 (nfqws/nfqws2), NetBird, MosDNS, LaLune (csqtt/lalune)
-    for proc in clash mihomo ssclash fptn nfqws nfqws2 netbird mosdns csqtt lalune; do
+    for proc in clash mihomo ssclash fptn nfqws nfqws2 netbird mosdns csqtt; do
         for pid in $(pidof "$proc" 2>/dev/null); do
             taskset -p "$APP_MASK" "$pid" 2>/dev/null || true
         done

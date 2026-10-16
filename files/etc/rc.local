@@ -1,23 +1,22 @@
 #!/bin/sh
 
-# 1. Автоматическая настройка Wi-Fi при первой загрузке
+# ---- Конфигурация Wi-Fi по умолчанию (только при первом старте) ----
 if [ ! -f /etc/wifi_configured_done ]; then
     sleep 4
     wifi config 2>/dev/null
 
     BOARD_NAME=$(cat /tmp/sysinfo/board_name 2>/dev/null || echo "")
     case "$BOARD_NAME" in
-        *ax3600*)  SSID_NAME="ax3600" ;;
-        *ax6000*)  SSID_NAME="ax6000" ;;
-        *ax6s*)    SSID_NAME="ax6s" ;;
-        *)         SSID_NAME="OpenWrt" ;;
+        *ax3600*) SSID_NAME="ax3600"  ;;
+        *ax6000*) SSID_NAME="ax6000"  ;;
+        *ax6s*)   SSID_NAME="ax6s"    ;;
+        *)        SSID_NAME="OpenWrt"  ;;
     esac
 
-    # Включаем основные диапазоны radio0 (2.4G) и radio1 (5G)
     uci set wireless.radio0.disabled='0' 2>/dev/null || true
     uci set wireless.radio1.disabled='0' 2>/dev/null || true
 
-    # Для AX3600: отключаем AIoT в конфигурации wireless
+    # AX3600: отключение IoT-радио (Candatech ath10k)
     if echo "$BOARD_NAME" | grep -q "ax3600"; then
         uci set wireless.radio2.disabled='1' 2>/dev/null || true
         for iface in $(uci -q show wireless | grep "device='radio2'" | cut -d. -f2); do
@@ -25,7 +24,7 @@ if [ ! -f /etc/wifi_configured_done ]; then
         done
     fi
 
-    # Задаем SSID и WPA2-PSK
+    # Настройка клиентских интерфейсов
     for iface in $(uci -q show wireless | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
         dev=$(uci -q get wireless.${iface}.device)
         if [ "$dev" = "radio0" ] || [ "$dev" = "radio1" ]; then
@@ -41,17 +40,44 @@ if [ ! -f /etc/wifi_configured_done ]; then
     touch /etc/wifi_configured_done
 fi
 
-# 2. Отключение светодиода AIoT (если присутствует в sysfs)
+# ---- Деактивация LED AIoT (AX3600/AX6000) ----
 for d in /sys/class/leds/*aiot*; do
     [ -d "$d" ] || continue
     echo none > "$d/trigger" 2>/dev/null || true
-    echo 0 > "$d/brightness" 2>/dev/null || true
+    echo 0    > "$d/brightness" 2>/dev/null || true
 done
 
-# Ожидание спавна дочерних процессов в RAM и изоляция affinity (CPU 1)
-sleep 2
-if [ -x /etc/init.d/smp-tune ]; then
-    /etc/init.d/smp-tune restart >/dev/null 2>&1 || true
+# ---- Распаковка NetBird из Flash в RAM (AX6000 RA72) ----
+if [ ! -f /tmp/netbird ] && [ -f /opt/netbird.tar.gz ]; then
+    tar -xzf /opt/netbird.tar.gz -C /tmp netbird 2>/dev/null || true
+    chmod 0755 /tmp/netbird 2>/dev/null || true
+    mkdir -p /usr/share/netbird/bin 2>/dev/null || true
+    ln -sf /tmp/netbird /usr/share/netbird/bin/netbird-release 2>/dev/null || true
+    ln -sf /tmp/netbird /usr/share/netbird/bin/netbird            2>/dev/null || true
+    ln -sf /tmp/netbird /usr/bin/netbird                         2>/dev/null || true
+    /etc/init.d/netbird restart 2>/dev/null || true
 fi
+
+# ---- Распаковка Mihomo из Flash в RAM (AX6000 RA72) ----
+if [ ! -f /tmp/clash/bin/clash ] && [ -f /opt/mihomo.gz ]; then
+    mkdir -p /tmp/clash/bin 2>/dev/null || true
+    gzip -dc /opt/mihomo.gz > /tmp/clash/bin/clash 2>/dev/null || true
+    chmod 0755 /tmp/clash/bin/clash 2>/dev/null || true
+    mkdir -p /opt/clash/bin 2>/dev/null || true
+    ln -sf /tmp/clash/bin/clash /opt/clash/bin/clash 2>/dev/null || true
+    /etc/init.d/ssclash restart 2>/dev/null || true
+fi
+
+# ---- Распаковка CSQTT из Flash в RAM (AX6000 RA72) ----
+if [ ! -f /tmp/csqtt ] && [ -f /opt/csqtt.gz ]; then
+    gzip -dc /opt/csqtt.gz > /tmp/csqtt 2>/dev/null || true
+    chmod 0755 /tmp/csqtt 2>/dev/null || true
+    ln -sf /tmp/csqtt /usr/bin/csqtt 2>/dev/null || true
+    /etc/init.d/csqtt restart 2>/dev/null || true
+fi
+
+# ---- Финализация SMP Affinity с защитным таймаутом ----
+sleep 2
+[ -x /etc/init.d/smp-tune ] && /etc/init.d/smp-tune restart >/dev/null 2>&1 || true
 
 exit 0
