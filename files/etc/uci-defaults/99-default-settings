@@ -12,10 +12,13 @@ esac
 uci set system.@system[0].hostname="$HN"
 uci commit system
 
-# 2. IP адрес LAN: 192.168.10.1 и сетевой стек
-uci set network.lan.ipaddr='192.168.10.1'
-uci set network.lan.netmask='255.255.255.0'
-uci set network.lan.ip6assign='60'
+# 2. IP адрес LAN: 192.168.10.1 (только если не сохранен кастомный режим Dumb AP)
+if [ -z "$(uci -q get network.lan.gateway)" ]; then
+    uci set network.lan.ipaddr='192.168.10.1'
+    uci set network.lan.netmask='255.255.255.0'
+    uci set network.lan.ip6assign='60'
+    uci -q delete dhcp.lan.ignore
+fi
 uci set network.globals.packet_steering='1'
 uci commit network
 
@@ -59,7 +62,7 @@ uci set luci.main.mediaurlbase='/luci-static/openwrt-2020'
 uci commit luci
 
 # 8. Отключение служб по умолчанию
-for s in ssclash zapret zapret2 watchcat ddns fptn lalune collectd; do
+for s in ssclash zapret zapret2 watchcat ddns fptn csqtt collectd; do
     if [ -f "/etc/init.d/$s" ]; then
         /etc/init.d/$s disable 2>/dev/null || true
         /etc/init.d/$s stop 2>/dev/null || true
@@ -96,8 +99,6 @@ sysctl -p /etc/sysctl.d/99-optimization.conf 2>/dev/null || true
 
 /etc/init.d/smp-tune enable 2>/dev/null || true
 
-exit 0
-
 # 13. Оптимизация ядра и Go Runtime под объем памяти
 if [ "$HN" = "ax6s" ]; then
     sysctl -w vm.min_free_kbytes=8192 2>/dev/null || true
@@ -127,3 +128,5 @@ chmod +x /etc/profile.d/golang.sh
 if [ -f /etc/init.d/ssclash ]; then
     sed -i "/procd_open_instance/a \        procd_set_param env GOMEMLIMIT=${GO_MEM} GOGC=50 GODEBUG=madvdontneed=1" /etc/init.d/ssclash 2>/dev/null || true
 fi
+
+exit 0
