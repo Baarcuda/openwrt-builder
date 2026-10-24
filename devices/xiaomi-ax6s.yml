@@ -3,5 +3,5 @@ target: mediatek
 subtarget: mt7622
 profile: xiaomi_redmi-router-ax6s
 arch: aarch64_cortex-a53
-ref: 58efa9917d4cc53fceed173529a286187649e827
-ref_name: 25.12-latest
+ref: f3f5c2e54bf432b444e36b1a77077ff476361825
+ref_name: v25.12.6

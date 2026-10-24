@@ -116,7 +116,7 @@ jobs:
           body: |
             ## Релиз OpenWrt 25.12 для ${{ steps.info.outputs.dev_name }}
 
-            * **Базовый коммит:** `58efa9917d4cc53fceed173529a286187649e827` (тег `${{ steps.info.outputs.version }}`)
+            * **Базовый коммит:** `f3f5c2e54bf432b444e36b1a77077ff476361825` (тег `${{ steps.info.outputs.version }}`)
             * **Ядро Linux:** 6.12.112 (ARM64 Cortex-A53)
 
             ### Контрольные суммы SHA-256
