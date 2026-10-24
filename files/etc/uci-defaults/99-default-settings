@@ -43,9 +43,13 @@ uci set dhcp.@dnsmasq[0].dnsforwardmax='1000'
 uci set dhcp.@dnsmasq[0].logqueries='1'
 uci commit dhcp
 
-# 5. Аппаратное и программное ускорение
+# 5. Ускорение NAT (Flow Offloading: HW PPE для MediaTek AX6S, чистый SW для Qualcomm)
 uci set firewall.@defaults[0].flow_offloading='1'
-uci set firewall.@defaults[0].flow_offloading_hw='1'
+if [ "$HN" = "ax6s" ]; then
+    uci set firewall.@defaults[0].flow_offloading_hw='1'
+else
+    uci set firewall.@defaults[0].flow_offloading_hw='0'
+fi
 uci commit firewall
 
 # 6. ZRAM компрессия LZ4 (128 МБ для AX6S, 256 МБ для остальных)

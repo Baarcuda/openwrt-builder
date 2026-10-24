@@ -20,7 +20,7 @@ start() {
     CORES=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || echo 1)
 
     if [ "$CORES" -ge 4 ]; then
-        # 4 ядра (AX3600): Сеть и Wi-Fi на CPU 0,1 (маска 3); Приложения на CPU 2,3 (маска c)
+        # 4 ядра (AX3600): Сеть и Wi-Fi на CPU 0,1 (RPS=3, IRQ чередование 1/2); Приложения на CPU 2,3 (маска c)
         NET_MASK="3"
         APP_MASK="c"
     elif [ "$CORES" -ge 2 ]; then
@@ -32,9 +32,21 @@ start() {
         APP_MASK="1"
     fi
 
-    # 1. Аппаратные прерывания Ethernet и Wi-Fi (ath11k, mt76, edma) на сетевые ядра
-    for irq in $(awk -F: '/ath11k|mt76|edma|eth/ {print $1}' /proc/interrupts 2>/dev/null | tr -d ' '); do
-        [ -f "/proc/irq/$irq/smp_affinity" ] && echo "$NET_MASK" > "/proc/irq/$irq/smp_affinity" 2>/dev/null || true
+    # 1. Аппаратные прерывания Ethernet и Wi-Fi (ARM64 GIC требует одиночное ядро: чередуем 1 и 2 для 4 ядер)
+    i=0
+    for irq in $(awk -F: '/ath11k|mt76|edma|eth|ce[0-9]|wbm2host|reo2host|reo2ost|rxdma/ {print $1}' /proc/interrupts 2>/dev/null | tr -d ' '); do
+        if [ -f "/proc/irq/$irq/smp_affinity" ]; then
+            if [ "$CORES" -ge 4 ]; then
+                if [ $((i % 2)) -eq 0 ]; then
+                    echo 1 > "/proc/irq/$irq/smp_affinity" 2>/dev/null || true
+                else
+                    echo 2 > "/proc/irq/$irq/smp_affinity" 2>/dev/null || true
+                fi
+                i=$((i + 1))
+            else
+                echo "$NET_MASK" > "/proc/irq/$irq/smp_affinity" 2>/dev/null || true
+            fi
+        fi
     done
 
     # 2. Привязка RPS (Receive Packet Steering) для всех интерфейсов к сетевым ядрам
@@ -50,7 +62,6 @@ start() {
     done
 
     # 4. Привязка процессов (Affinity) к выделенным ядрам приложений
-    # Включает: Mihomo/SSClash, FPTN, Zapret/Zapret2 (nfqws/nfqws2), NetBird, MosDNS, LaLune (csqtt/lalune)
     for proc in clash mihomo ssclash fptn nfqws nfqws2 netbird mosdns csqtt; do
         for pid in $(pidof "$proc" 2>/dev/null); do
             taskset -p "$APP_MASK" "$pid" 2>/dev/null || true
