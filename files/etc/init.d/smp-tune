@@ -43,7 +43,7 @@ start() {
     done
 
     # 3. Увеличение очереди передачи txqueuelen для виртуальных интерфейсов (TUN/TAP/VPN)
-    for iface in clash-tun wt0 fptn0 tun0 awg0 wg0; do
+    for iface in clash-tun csqtt0 wt0 fptn0 tun0 awg0 wg0; do
         if [ -d "/sys/class/net/$iface" ]; then
             ip link set dev "$iface" txqueuelen 2500 2>/dev/null || true
         fi
