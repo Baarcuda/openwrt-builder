@@ -34,7 +34,7 @@ start() {
 
     # 1. Аппаратные прерывания Ethernet и Wi-Fi (ARM64 GIC требует одиночное ядро: чередуем 1 и 2 для 4 ядер)
     i=0
-    for irq in $(awk -F: '/ath11k|mt76|edma|eth|ce[0-9]|wbm2host|reo2host|reo2ost|rxdma/ {print $1}' /proc/interrupts 2>/dev/null | tr -d ' '); do
+    for irq in $(awk -F: '/ath11k|mt76|edma|eth|wbm2host|reo2host|reo2ost|rxdma/ {print $1}' /proc/interrupts 2>/dev/null | tr -d ' '); do
         if [ -f "/proc/irq/$irq/smp_affinity" ]; then
             if [ "$CORES" -ge 4 ]; then
                 if [ $((i % 2)) -eq 0 ]; then
