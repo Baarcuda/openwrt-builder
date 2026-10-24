@@ -64,7 +64,7 @@ if [ "$UPDATE_REF" -eq 1 ]; then
   fi
 fi
 
-[ -n "$REF" ] || REF="58efa9917d4cc53fceed173529a286187649e827"
+[ -n "$REF" ] || REF="f3f5c2e54bf432b444e36b1a77077ff476361825"
 
 echo "=========================================================="
 echo " Сборка: $DEVICE ($TARGET/$SUBTARGET - $PROFILE)"
@@ -80,6 +80,12 @@ else
   git clone https://git.openwrt.org/openwrt/openwrt.git "$TREE"
 fi
 git -C "$TREE" checkout -f --detach "$REF"
+
+# Фикс PKG_MIRROR_HASH для qca-ssdk (2026.06.04~bb4f3f0b) при упаковке git archive на Ubuntu 24.04
+if [ -f "$TREE/package/kernel/qca-ssdk/Makefile" ]; then
+  sed -i 's/4f0628b9c99403588cb10223a03c456a8f7594f5d233ec11e745a237bf3357fb/da990d2956db471071568fd6c7c9193b075f9a1e87e5ae5ac8729cc4dba9dc24/g' \
+    "$TREE/package/kernel/qca-ssdk/Makefile"
+fi
 
 # Активация бэкендов LZ4 и ZSTD в ядре Linux 6.12 для ZRAM
 for kcfg in "$TREE/target/linux/$TARGET/config-6.12" "$TREE/target/linux/generic/config-6.12"; do
